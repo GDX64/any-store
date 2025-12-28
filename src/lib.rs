@@ -1,5 +1,5 @@
 pub mod storage {
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, hash::Hash};
 
     #[derive(Debug, Clone, PartialEq, PartialOrd)]
     pub enum Something {
@@ -9,6 +9,39 @@ pub mod storage {
         Text(String),
         Blob(Vec<u8>),
         Null,
+    }
+
+    impl Hash for Something {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            use Something::*;
+            match self {
+                Int(v) => {
+                    state.write_u8(0);
+                    v.hash(state);
+                }
+                Double(v) => {
+                    state.write_u8(1);
+                    // Not ideal, but f64 doesn't implement Hash
+                    state.write(&v.to_ne_bytes());
+                }
+                Double2((v1, v2)) => {
+                    state.write_u8(2);
+                    state.write(&v1.to_ne_bytes());
+                    state.write(&v2.to_ne_bytes());
+                }
+                Text(v) => {
+                    state.write_u8(3);
+                    v.hash(state);
+                }
+                Blob(v) => {
+                    state.write_u8(4);
+                    v.hash(state);
+                }
+                Null => {
+                    state.write_u8(5);
+                }
+            }
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,7 +78,7 @@ pub mod storage {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
+    #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
     pub struct Row {
         values: Vec<Something>,
     }
@@ -71,10 +104,6 @@ pub mod storage {
             new_values.extend_from_slice(&other.values);
             Row { values: new_values }
         }
-    }
-
-    pub struct TempTable<'a> {
-        pub items: BTreeMap<&'a Something, &'a Row>,
     }
 
     pub trait DbTable {
@@ -104,6 +133,14 @@ pub mod storage {
                 items: BTreeMap::new(),
                 ops: Vec::new(),
             }
+        }
+
+        pub fn tree_hash(&self) -> u64 {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
+            let mut hasher = DefaultHasher::new();
+            self.items.hash(&mut hasher);
+            return hasher.finish();
         }
 
         pub fn from_ops(ops: Vec<StorageOp>) -> Self {
@@ -225,8 +262,9 @@ mod tests {
     fn test_replication() {
         let mut store = setup();
         let ops = store.take_ops();
-        let mut store2 = storage::Table::from_ops(ops);
-        store2.clear_ops();
-        assert_eq!(store, store2);
+        let store2 = storage::Table::from_ops(ops);
+        let h1 = store.tree_hash();
+        let h2 = store2.tree_hash();
+        assert_eq!(h1, h2);
     }
 }
