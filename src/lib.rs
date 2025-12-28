@@ -8,6 +8,7 @@ pub mod storage {
         Double2((f64, f64)),
         Text(String),
         Blob(Vec<u8>),
+        Null,
     }
 
     impl Eq for Something {}
@@ -24,6 +25,9 @@ pub mod storage {
                 }
                 (Text(a), Text(b)) => a.cmp(b),
                 (Blob(a), Blob(b)) => a.cmp(b),
+                (Null, Null) => std::cmp::Ordering::Equal,
+                (Null, _) => std::cmp::Ordering::Less,
+                (_, Null) => std::cmp::Ordering::Greater,
                 _ => panic!("Unreachable comparison case"),
             }
         }
@@ -31,7 +35,7 @@ pub mod storage {
 
     #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
     pub struct Row {
-        values: Vec<Option<Something>>,
+        values: Vec<Something>,
     }
 
     impl Row {
@@ -41,14 +45,13 @@ pub mod storage {
 
         pub fn insert_at(&mut self, value: Something, index: usize) {
             if self.values.len() <= index {
-                self.values.resize(index + 1, None);
+                self.values.resize(index + 1, Something::Null);
             }
-            self.values[index] = Some(value);
+            self.values[index] = value;
         }
 
-        pub fn get(&self, index: usize) -> Option<&Something> {
-            let v = self.values.get(index)?.as_ref();
-            return v;
+        pub fn get(&self, index: usize) -> &Something {
+            return self.values.get(index).unwrap_or(&Something::Null);
         }
     }
 
@@ -69,6 +72,10 @@ pub mod storage {
             row.insert_at(value, index);
         }
 
+        pub fn remove(&mut self, key: &Something) {
+            self.items.remove(key);
+        }
+
         pub fn get(&self, key: &Something) -> Option<&Row> {
             return self.items.get(key);
         }
@@ -83,11 +90,10 @@ pub mod storage {
 
         pub fn rows_with<'a>(
             &'a self,
-            f: impl Fn(&Row) -> Option<()> + 'a,
+            f: impl Fn(&Row) -> bool + 'a,
         ) -> impl Iterator<Item = &'a Row> {
-            let iter = self.items.values().filter_map(move |k| {
-                f(k)?;
-                return Some(k);
+            let iter = self.items.values().filter(move |k| {
+                return f(k);
             });
             return iter;
         }
@@ -118,7 +124,7 @@ mod tests {
     fn it_works() {
         let store = setup();
         let k1 = Something::Int(10);
-        let value = store.get(&k1).and_then(|r| r.get(5));
+        let value = store.get(&k1).map(|r| r.get(5));
         let v1 = Something::Text("hello".into());
         assert_eq!(value, Some(&v1));
         let value = store.get(&Something::Int(-1));
@@ -129,10 +135,7 @@ mod tests {
     fn test_rows_with() {
         let store = setup();
         let rows = store.rows_with(|r| {
-            if r.get(5)? == &Something::Text("hello".into()) {
-                return Some(());
-            }
-            return None;
+            return r.get(5) == &Something::Text("hello".into());
         });
 
         assert_eq!(rows.count(), 2);
