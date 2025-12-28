@@ -5,6 +5,7 @@ mod storage {
     pub enum Something {
         Int(i64),
         Double(f64),
+        Double2((f64, f64)),
         Text(String),
         Blob(Vec<u8>),
     }
@@ -18,20 +19,40 @@ mod storage {
                 (Double(a), Double(b)) => {
                     a.partial_cmp(b).expect("Double values must be comparable")
                 }
+                (Double2(a), Double2(b)) => {
+                    a.partial_cmp(b).expect("Double2 values must be comparable")
+                }
                 (Text(a), Text(b)) => a.cmp(b),
                 (Blob(a), Blob(b)) => a.cmp(b),
-                (Int(_), _) => std::cmp::Ordering::Less,
-                (Double(_), Int(_)) => std::cmp::Ordering::Greater,
-                (Double(_), _) => std::cmp::Ordering::Less,
-                (Text(_), Blob(_)) => std::cmp::Ordering::Less,
-                (Text(_), _) => std::cmp::Ordering::Greater,
-                (Blob(_), _) => std::cmp::Ordering::Greater,
+                _ => panic!("Unreachable comparison case"),
             }
         }
     }
 
+    pub struct Row {
+        values: Vec<Option<Something>>,
+    }
+
+    impl Row {
+        pub fn new() -> Self {
+            Row { values: Vec::new() }
+        }
+
+        pub fn insert_at(&mut self, value: Something, index: usize) {
+            if self.values.len() <= index {
+                self.values.resize(index + 1, None);
+            }
+            self.values[index] = Some(value);
+        }
+
+        pub fn get(&self, index: usize) -> Option<&Something> {
+            let v = self.values.get(index)?.as_ref();
+            return v;
+        }
+    }
+
     pub struct Store {
-        items: BTreeMap<Something, Vec<Option<Something>>>,
+        items: BTreeMap<Something, Row>,
     }
 
     impl Store {
@@ -43,17 +64,24 @@ mod storage {
 
         pub fn insert_at(&mut self, key: Something, value: Something, index: usize) {
             let e = self.items.entry(key);
-            let vec = e.or_insert_with(Vec::new);
-            if vec.len() <= index {
-                vec.resize(index + 1, None);
-            }
-            vec[index] = Some(value);
+            let row = e.or_insert_with(Row::new);
+            row.insert_at(value, index);
         }
 
         pub fn get_at(&self, key: &Something, index: usize) -> Option<&Something> {
             let v = self.items.get(key)?;
-            let v = v.get(index)?.as_ref();
-            return v;
+            return v.get(index);
+        }
+
+        pub fn rows_with(&self, f: impl Fn(&Row) -> Option<()>) -> Vec<&Row> {
+            return self
+                .items
+                .values()
+                .filter_map(|k| {
+                    f(k)?;
+                    return Some(k);
+                })
+                .collect();
         }
     }
 }
@@ -76,5 +104,27 @@ mod tests {
         assert_eq!(value, Some(&v1));
         let value = store.get_at(&k1, 4);
         assert_eq!(value, None);
+    }
+
+    #[test]
+    fn test_rows_with() {
+        let mut store = storage::Store::new();
+        let v1 = Something::Text("hello".into());
+        let k1 = Something::Int(10);
+        store.insert_at(k1.clone(), v1.clone(), 5);
+        let v2 = Something::Text("world".into());
+        let k2 = Something::Int(20);
+        store.insert_at(k2.clone(), v2.clone(), 3);
+        let k3 = Something::Int(30);
+        store.insert_at(k3.clone(), v1.clone(), 5);
+
+        let rows = store.rows_with(|r| {
+            if r.get(5)? == &v1 {
+                return Some(());
+            }
+            return None;
+        });
+
+        assert_eq!(rows.len(), 2);
     }
 }
