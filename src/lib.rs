@@ -65,55 +65,9 @@ pub mod storage {
         pub items: BTreeMap<&'a Something, &'a Row>,
     }
 
-    impl<'a> TempTable<'a> {
-        pub fn new() -> TempTable<'a> {
-            TempTable {
-                items: BTreeMap::new(),
-            }
-        }
-
-        pub fn insert(&mut self, key: &'a Something, value: &'a Row) {
-            self.items.insert(key, value);
-        }
-    }
-
-    impl DbTable for TempTable<'_> {
-        fn get(&self, key: &Something) -> Option<&Row> {
-            self.items.get(key).copied()
-        }
-
-        fn iter(&self) -> impl Iterator<Item = (&Something, &Row)> {
-            self.items.iter().map(|(k, v)| (*k, *v))
-        }
-    }
-
     pub trait DbTable {
         fn get(&self, key: &Something) -> Option<&Row>;
         fn iter(&self) -> impl Iterator<Item = (&Something, &Row)>;
-
-        fn filtered<'a>(&'a self, f: impl Fn(&Row) -> bool) -> TempTable<'a> {
-            let mut result = TempTable::new();
-            for (k, v) in self.iter() {
-                if f(v) {
-                    result.items.insert(k, v);
-                }
-            }
-            return result;
-        }
-
-        fn join(&self, other: &impl DbTable, c1: usize, c2: usize) -> TempTable<'_> {
-            let mut result = TempTable::new();
-            for (k1, row1) in self.iter() {
-                let v1 = row1.get(c1);
-                for (_, row2) in other.iter() {
-                    if v1 == row2.get(c2) {
-                        let merged_row = row1.merged(row2);
-                        result.items.insert(k1, &merged_row);
-                    }
-                }
-            }
-            result
-        }
     }
 
     pub struct Table {
