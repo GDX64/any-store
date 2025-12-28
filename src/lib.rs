@@ -11,6 +11,18 @@ pub mod storage {
         Null,
     }
 
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub enum StorageOp {
+        Insert {
+            key: Something,
+            value: Something,
+            index: usize,
+        },
+        Remove {
+            key: Something,
+        },
+    }
+
     impl Eq for Something {}
     impl Ord for Something {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
@@ -70,8 +82,10 @@ pub mod storage {
         fn iter(&self) -> impl Iterator<Item = (&Something, &Row)>;
     }
 
+    #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct Table {
         items: BTreeMap<Something, Row>,
+        ops: Vec<StorageOp>,
     }
 
     impl DbTable for Table {
@@ -88,16 +102,50 @@ pub mod storage {
         pub fn new() -> Self {
             Table {
                 items: BTreeMap::new(),
+                ops: Vec::new(),
             }
         }
 
+        pub fn from_ops(ops: Vec<StorageOp>) -> Self {
+            let mut table = Table::new();
+            table.apply_ops(ops);
+            return table;
+        }
+
+        pub fn apply_ops(&mut self, ops: Vec<StorageOp>) {
+            for op in ops {
+                match op {
+                    StorageOp::Insert { key, value, index } => {
+                        self.insert_at(key, value, index);
+                    }
+                    StorageOp::Remove { key } => {
+                        self.remove(&key);
+                    }
+                }
+            }
+        }
+
+        pub fn clear_ops(&mut self) {
+            self.ops.clear();
+        }
+
+        pub fn take_ops(&mut self) -> Vec<StorageOp> {
+            return std::mem::take(&mut self.ops);
+        }
+
         pub fn insert_at(&mut self, key: Something, value: Something, index: usize) {
+            self.ops.push(StorageOp::Insert {
+                key: key.clone(),
+                value: value.clone(),
+                index,
+            });
             let e = self.items.entry(key);
             let row = e.or_insert_with(Row::new);
             row.insert_at(value, index);
         }
 
         pub fn remove(&mut self, key: &Something) {
+            self.ops.push(StorageOp::Remove { key: key.clone() });
             self.items.remove(key);
         }
 
@@ -171,5 +219,14 @@ mod tests {
         let store = setup();
         let range = store.get_range(&Something::Int(15), &Something::Int(35));
         assert!(range.count() > 1);
+    }
+
+    #[test]
+    fn test_replication() {
+        let mut store = setup();
+        let ops = store.take_ops();
+        let mut store2 = storage::Table::from_ops(ops);
+        store2.clear_ops();
+        assert_eq!(store, store2);
     }
 }
