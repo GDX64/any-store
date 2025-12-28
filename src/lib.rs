@@ -21,13 +21,12 @@ pub mod storage {
                 }
                 Double(v) => {
                     state.write_u8(1);
-                    // Not ideal, but f64 doesn't implement Hash
-                    state.write(&v.to_ne_bytes());
+                    state.write(&v.to_le_bytes());
                 }
                 Double2((v1, v2)) => {
                     state.write_u8(2);
-                    state.write(&v1.to_ne_bytes());
-                    state.write(&v2.to_ne_bytes());
+                    state.write(&v1.to_le_bytes());
+                    state.write(&v2.to_le_bytes());
                 }
                 Text(v) => {
                     state.write_u8(3);
