@@ -29,6 +29,7 @@ mod storage {
         }
     }
 
+    #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
     pub struct Row {
         values: Vec<Option<Something>>,
     }
@@ -68,9 +69,8 @@ mod storage {
             row.insert_at(value, index);
         }
 
-        pub fn get_at(&self, key: &Something, index: usize) -> Option<&Something> {
-            let v = self.items.get(key)?;
-            return v.get(index);
+        pub fn get(&self, key: &Something) -> Option<&Row> {
+            return self.items.get(key);
         }
 
         pub fn rows_with(&self, f: impl Fn(&Row) -> Option<()>) -> Vec<&Row> {
@@ -92,22 +92,7 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn it_works() {
-        let mut store = storage::Store::new();
-
-        let v1 = Something::Text("hello".into());
-        let k1 = Something::Int(10);
-        store.insert_at(k1.clone(), v1.clone(), 5);
-
-        let value = store.get_at(&k1, 5);
-        assert_eq!(value, Some(&v1));
-        let value = store.get_at(&k1, 4);
-        assert_eq!(value, None);
-    }
-
-    #[test]
-    fn test_rows_with() {
+    fn setup() -> storage::Store {
         let mut store = storage::Store::new();
         let v1 = Something::Text("hello".into());
         let k1 = Something::Int(10);
@@ -118,8 +103,25 @@ mod tests {
         let k3 = Something::Int(30);
         store.insert_at(k3.clone(), v1.clone(), 5);
 
+        return store;
+    }
+
+    #[test]
+    fn it_works() {
+        let store = setup();
+        let k1 = Something::Int(10);
+        let value = store.get(&k1).and_then(|r| r.get(5));
+        let v1 = Something::Text("hello".into());
+        assert_eq!(value, Some(&v1));
+        let value = store.get(&Something::Int(-1));
+        assert_eq!(value, None);
+    }
+
+    #[test]
+    fn test_rows_with() {
+        let store = setup();
         let rows = store.rows_with(|r| {
-            if r.get(5)? == &v1 {
+            if r.get(5)? == &Something::Text("hello".into()) {
                 return Some(());
             }
             return None;
