@@ -1,4 +1,4 @@
-mod storage {
+pub mod storage {
     use std::collections::BTreeMap;
 
     #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -73,15 +73,23 @@ mod storage {
             return self.items.get(key);
         }
 
-        pub fn rows_with(&self, f: impl Fn(&Row) -> Option<()>) -> Vec<&Row> {
-            return self
-                .items
-                .values()
-                .filter_map(|k| {
-                    f(k)?;
-                    return Some(k);
-                })
-                .collect();
+        pub fn get_range(
+            &self,
+            start: &Something,
+            end: &Something,
+        ) -> impl Iterator<Item = (&Something, &Row)> {
+            return self.items.range(start.clone()..end.clone());
+        }
+
+        pub fn rows_with<'a>(
+            &'a self,
+            f: impl Fn(&Row) -> Option<()> + 'a,
+        ) -> impl Iterator<Item = &'a Row> {
+            let iter = self.items.values().filter_map(move |k| {
+                f(k)?;
+                return Some(k);
+            });
+            return iter;
         }
     }
 }
@@ -127,6 +135,13 @@ mod tests {
             return None;
         });
 
-        assert_eq!(rows.len(), 2);
+        assert_eq!(rows.count(), 2);
+    }
+
+    #[test]
+    fn test_ordering() {
+        let store = setup();
+        let range = store.get_range(&Something::Int(15), &Something::Int(35));
+        assert!(range.count() > 1);
     }
 }
