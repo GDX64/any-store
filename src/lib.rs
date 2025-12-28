@@ -52,13 +52,13 @@ pub mod storage {
         }
     }
 
-    pub struct Store {
+    pub struct Table {
         items: BTreeMap<Something, Row>,
     }
 
-    impl Store {
+    impl Table {
         pub fn new() -> Self {
-            Store {
+            Table {
                 items: BTreeMap::new(),
             }
         }
@@ -100,8 +100,8 @@ mod tests {
 
     use super::*;
 
-    fn setup() -> storage::Store {
-        let mut store = storage::Store::new();
+    fn setup() -> storage::Table {
+        let mut store = storage::Table::new();
         let v1 = Something::Text("hello".into());
         let k1 = Something::Int(10);
         store.insert_at(k1.clone(), v1.clone(), 5);
