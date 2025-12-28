@@ -44,15 +44,17 @@ pub mod storage {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub enum StorageOp {
         Insert {
             key: Something,
             value: Something,
             index: usize,
+            version: u64,
         },
         Remove {
             key: Something,
+            version: u64,
         },
     }
 
@@ -98,12 +100,6 @@ pub mod storage {
         pub fn get(&self, index: usize) -> &Something {
             return self.values.get(index).unwrap_or(&Something::Null);
         }
-
-        pub fn merged(&self, other: &Row) -> Row {
-            let mut new_values = self.values.clone();
-            new_values.extend_from_slice(&other.values);
-            Row { values: new_values }
-        }
     }
 
     pub trait DbTable {
@@ -115,6 +111,8 @@ pub mod storage {
     pub struct Table {
         items: BTreeMap<Something, Row>,
         ops: Vec<StorageOp>,
+        version_counter: u64,
+        is_replica: bool,
     }
 
     impl DbTable for Table {
@@ -128,11 +126,21 @@ pub mod storage {
     }
 
     impl Table {
-        pub fn new() -> Self {
+        pub fn new(is_replica: bool) -> Self {
             Table {
                 items: BTreeMap::new(),
                 ops: Vec::new(),
+                version_counter: 0,
+                is_replica,
             }
+        }
+
+        fn next_version(&mut self) -> u64 {
+            if self.is_replica {
+                return 0;
+            }
+            self.version_counter += 1;
+            return self.version_counter;
         }
 
         pub fn tree_hash(&self) -> u64 {
@@ -144,7 +152,7 @@ pub mod storage {
         }
 
         pub fn from_ops(ops: Vec<StorageOp>) -> Self {
-            let mut table = Table::new();
+            let mut table = Table::new(true);
             table.apply_ops(ops);
             return table;
         }
@@ -152,13 +160,28 @@ pub mod storage {
         pub fn apply_ops(&mut self, ops: Vec<StorageOp>) {
             for op in ops {
                 match op {
-                    StorageOp::Insert { key, value, index } => {
+                    StorageOp::Insert {
+                        key,
+                        value,
+                        index,
+                        version,
+                    } => {
+                        self.update_version(version);
                         self.insert_at(key, value, index);
                     }
-                    StorageOp::Remove { key } => {
+                    StorageOp::Remove { key, version } => {
+                        self.update_version(version);
                         self.remove(&key);
                     }
                 }
+            }
+        }
+
+        fn update_version(&mut self, version: u64) {
+            if version == self.version_counter + 1 {
+                self.version_counter = version;
+            } else {
+                panic!("Version mismatch in replica table");
             }
         }
 
@@ -170,11 +193,19 @@ pub mod storage {
             return std::mem::take(&mut self.ops);
         }
 
+        fn push_op(&mut self, op: StorageOp) {
+            if !self.is_replica {
+                self.ops.push(op);
+            }
+        }
+
         pub fn insert_at(&mut self, key: Something, value: Something, index: usize) {
-            self.ops.push(StorageOp::Insert {
+            let version = self.next_version();
+            self.push_op(StorageOp::Insert {
                 key: key.clone(),
                 value: value.clone(),
                 index,
+                version,
             });
             let e = self.items.entry(key);
             let row = e.or_insert_with(Row::new);
@@ -182,7 +213,12 @@ pub mod storage {
         }
 
         pub fn remove(&mut self, key: &Something) {
-            self.ops.push(StorageOp::Remove { key: key.clone() });
+            let version = self.next_version();
+
+            self.push_op(StorageOp::Remove {
+                key: key.clone(),
+                version,
+            });
             self.items.remove(key);
         }
 
@@ -217,7 +253,7 @@ mod tests {
     use super::*;
 
     fn setup() -> storage::Table {
-        let mut store = storage::Table::new();
+        let mut store = storage::Table::new(false);
         let v1 = Something::Text("hello".into());
         let k1 = Something::Int(10);
         store.insert_at(k1.clone(), v1.clone(), 5);
