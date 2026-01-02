@@ -3,7 +3,7 @@ use std::hash::Hash;
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Something {
     Int(i64),
-    Text(String),
+    ValueString(ValueString),
     Null,
 }
 
@@ -12,9 +12,13 @@ impl Something {
         use Something::*;
         match self {
             Int(_) => 0,
-            Text(_) => 1,
+            ValueString(_) => 1,
             Null => 2,
         }
+    }
+
+    pub fn string(s: String) -> Self {
+        Something::ValueString(ValueString::new(&s))
     }
 }
 
@@ -26,7 +30,7 @@ impl Hash for Something {
             Int(v) => {
                 v.hash(state);
             }
-            Text(v) => {
+            ValueString(v) => {
                 v.hash(state);
             }
             Null => {}
@@ -45,7 +49,7 @@ impl Ord for Something {
             //     a.partial_cmp(b).expect("Double2 values must be comparable")
             // }
             // (Blob(a), Blob(b)) => a.cmp(b),
-            (Text(a), Text(b)) => a.cmp(b),
+            (ValueString(a), ValueString(b)) => a.cmp(b),
             (Null, Null) => std::cmp::Ordering::Equal,
             (Null, _) => std::cmp::Ordering::Less,
             (_, Null) => std::cmp::Ordering::Greater,
@@ -62,7 +66,7 @@ impl Serializable for Something {
             Int(v) => {
                 buffer.write_bytes(&v.to_le_bytes());
             }
-            Text(v) => {
+            ValueString(v) => {
                 let bytes = v.as_bytes();
                 let len = bytes.len() as u64;
                 buffer.write_bytes(&len.to_le_bytes());
@@ -85,7 +89,7 @@ impl Serializable for Something {
                 let len = u64::from_le_bytes(len_bytes.try_into().unwrap()) as usize;
                 let str_bytes = buffer.read_bytes(len);
                 let text_value = String::from_utf8(str_bytes.to_vec()).unwrap();
-                Something::Text(text_value)
+                Something::ValueString(ValueString::new(&text_value))
             }
             2 => Something::Null,
             _ => panic!("Unknown tag in Something deserialization"),
@@ -120,5 +124,38 @@ impl ByteBuffer {
         let end = start + length;
         self.position = end;
         &self.buffer[start..end]
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Hash, Eq, Ord)]
+struct SmallString {
+    data: [u8; 16],
+    len: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Hash, Eq, Ord)]
+pub enum ValueString {
+    Small(SmallString),
+    Large(String),
+}
+
+impl ValueString {
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            ValueString::Small(small) => &small.data[..small.len],
+            ValueString::Large(large) => large.as_bytes(),
+        }
+    }
+}
+
+impl ValueString {
+    fn new(s: &str) -> Self {
+        if s.len() <= 16 {
+            let mut data = [0u8; 16];
+            data[..s.len()].copy_from_slice(s.as_bytes());
+            ValueString::Small(SmallString { data, len: s.len() })
+        } else {
+            ValueString::Large(s.to_string())
+        }
     }
 }
