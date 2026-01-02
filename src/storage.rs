@@ -37,27 +37,12 @@ impl Row {
     }
 }
 
-pub trait DbTable {
-    fn get(&self, key: &Something) -> Option<&Row>;
-    fn iter(&self) -> impl Iterator<Item = (&Something, &Row)>;
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Table {
     items: BTreeMap<Something, Row>,
     ops: Vec<StorageOp>,
     version_counter: u64,
     is_replica: bool,
-}
-
-impl DbTable for Table {
-    fn get(&self, key: &Something) -> Option<&Row> {
-        return self.items.get(key);
-    }
-
-    fn iter(&self) -> impl Iterator<Item = (&Something, &Row)> {
-        self.items.iter()
-    }
 }
 
 impl Table {
@@ -68,6 +53,14 @@ impl Table {
             version_counter: 0,
             is_replica,
         }
+    }
+
+    pub fn get(&self, key: &Something) -> Option<&Row> {
+        return self.items.get(key);
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&Something, &Row)> {
+        self.items.iter()
     }
 
     fn next_version(&mut self) -> u64 {

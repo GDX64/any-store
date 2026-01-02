@@ -49,7 +49,7 @@ fn with_box_value<T: 'static, R, F: FnOnce(&mut T) -> R>(idx: usize, f: F) -> R 
 
 #[cfg(test)]
 mod tests {
-    use crate::{storage::DbTable, value::Something};
+    use crate::value::Something;
 
     use super::*;
 
