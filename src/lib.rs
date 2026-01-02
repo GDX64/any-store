@@ -1,6 +1,7 @@
 use std::{any::Any, cell::RefCell};
 
 mod storage;
+mod value;
 mod wasm;
 
 thread_local! {
@@ -48,7 +49,7 @@ fn with_box_value<T: 'static, R, F: FnOnce(&mut T) -> R>(idx: usize, f: F) -> R 
 
 #[cfg(test)]
 mod tests {
-    use crate::storage::{DbTable, Something};
+    use crate::{storage::DbTable, value::Something};
 
     use super::*;
 

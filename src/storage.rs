@@ -1,46 +1,5 @@
+use crate::value::Something;
 use std::{collections::BTreeMap, hash::Hash};
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub enum Something {
-    Int(i64),
-    Double(f64),
-    Double2((f64, f64)),
-    Text(String),
-    Blob(Vec<u8>),
-    Null,
-}
-
-impl Hash for Something {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        use Something::*;
-        match self {
-            Int(v) => {
-                state.write_u8(0);
-                v.hash(state);
-            }
-            Double(v) => {
-                state.write_u8(1);
-                state.write(&v.to_le_bytes());
-            }
-            Double2((v1, v2)) => {
-                state.write_u8(2);
-                state.write(&v1.to_le_bytes());
-                state.write(&v2.to_le_bytes());
-            }
-            Text(v) => {
-                state.write_u8(3);
-                v.hash(state);
-            }
-            Blob(v) => {
-                state.write_u8(4);
-                v.hash(state);
-            }
-            Null => {
-                state.write_u8(5);
-            }
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StorageOp {
@@ -54,26 +13,6 @@ pub enum StorageOp {
         key: Something,
         version: u64,
     },
-}
-
-impl Eq for Something {}
-impl Ord for Something {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use Something::*;
-        match (self, other) {
-            (Int(a), Int(b)) => a.cmp(b),
-            (Double(a), Double(b)) => a.partial_cmp(b).expect("Double values must be comparable"),
-            (Double2(a), Double2(b)) => {
-                a.partial_cmp(b).expect("Double2 values must be comparable")
-            }
-            (Text(a), Text(b)) => a.cmp(b),
-            (Blob(a), Blob(b)) => a.cmp(b),
-            (Null, Null) => std::cmp::Ordering::Equal,
-            (Null, _) => std::cmp::Ordering::Less,
-            (_, Null) => std::cmp::Ordering::Greater,
-            _ => panic!("Unreachable comparison case"),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
