@@ -9,17 +9,16 @@ async function main() {
   const wdb = await WDB.create(data);
   const table = wdb.createTable({
     name: "string",
+    age: "i64",
   });
   const k1 = WDB.i64(123n);
   const v1 = WDB.string("Hello, World!");
-  table.insert("name", k1, v1);
-  const k2 = WDB.i64(456n);
   const v2 = WDB.i64(789n);
-  table.insert("name", k2, v2);
+  table.insert("name", k1, v1);
+  table.insert("age", k1, v2);
   const val1 = table.get("name", k1);
-  const val2 = table.get("name", k2);
-  console.log("Got value for key 123:", val1);
-  console.log("Got value for key 456:", val2);
+  const val2 = table.get("age", k1);
+  console.log("Got value for key 123:", val1, val2);
 }
 
 main();

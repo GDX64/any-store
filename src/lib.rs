@@ -121,11 +121,6 @@ pub fn something_push_i64_to_stack(value: i64) {
 }
 
 #[unsafe(no_mangle)]
-pub fn something_pop_i64_from_stack() -> i64 {
-    return _something_pop_i64_from_stack().unwrap_or(-1);
-}
-
-#[unsafe(no_mangle)]
 pub fn something_pop_from_stack() -> i32 {
     let Some(value) = GLOBALS.pop_from_something_stack() else {
         return -1;
@@ -147,15 +142,6 @@ pub fn something_pop_from_stack() -> i32 {
             return -1;
         }
     }
-}
-
-fn _something_pop_i64_from_stack() -> Option<i64> {
-    let something = GLOBALS.pop_from_something_stack()?;
-    if let Something::Int(v) = something {
-        return Some(v);
-    } else {
-        return None;
-    };
 }
 
 #[unsafe(no_mangle)]
