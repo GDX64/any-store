@@ -1,132 +1,125 @@
-use std::{any::Any, cell::RefCell, sync::Mutex};
+pub mod storage;
+mod tests;
+pub mod value;
+pub mod wasm;
 
-mod storage;
-mod value;
-mod wasm;
+use std::{
+    any::Any,
+    collections::BTreeMap,
+    mem,
+    sync::{LazyLock, Mutex},
+};
 
-thread_local! {
-    static GLOBALS: RefCell<Vec<Box<dyn Any>>> = RefCell::new(Vec::new());
+use crate::{
+    storage::Table,
+    value::{ByteBuffer, Serializable, Something},
+};
+
+struct GlobalPool {
+    pool: Mutex<BTreeMap<usize, Box<dyn Any>>>,
+    stdin: Mutex<Vec<u8>>,
+    something_stack: Mutex<Vec<Something>>,
 }
 
-static GLOBAL_VAR: Mutex<i32> = Mutex::new(0);
+impl GlobalPool {
+    fn new() -> Self {
+        GlobalPool {
+            pool: Mutex::new(BTreeMap::new()),
+            stdin: Mutex::new(Vec::new()),
+            something_stack: Mutex::new(Vec::new()),
+        }
+    }
 
-#[unsafe(no_mangle)]
-pub fn set_global_var(value: i32) {
-    let mut gv = GLOBAL_VAR.lock().unwrap();
-    *gv = value;
-}
+    fn put_in_any_box<T: 'static>(&self, value: T) -> usize {
+        let mut pool = self.pool.lock().unwrap();
+        let new_key = if let Some((&key, _)) = pool.last_key_value() {
+            key + 1
+        } else {
+            0
+        };
+        pool.insert(new_key, Box::new(value));
+        return new_key;
+    }
 
-#[unsafe(no_mangle)]
-pub fn get_global_var() -> i32 {
-    let gv = GLOBAL_VAR.lock().unwrap();
-    *gv
-}
-
-#[unsafe(no_mangle)]
-pub fn create_vec() -> usize {
-    let v = vec![1, 2, 3];
-    return put_in_any_box(v);
-}
-
-fn put_in_any_box<T: 'static>(value: T) -> usize {
-    return GLOBALS.with(|globals| {
-        let mut globals = globals.borrow_mut();
-        let len = globals.len();
-        globals.push(Box::new(value));
-        return len;
-    });
-}
-
-#[unsafe(no_mangle)]
-pub fn push_vec(pointer: usize, value: i32) {
-    with_box_value(pointer, |v: &mut Vec<i32>| {
-        v.push(value);
-    })
-}
-
-#[unsafe(no_mangle)]
-pub fn get_vec(pointer: usize, index: usize) -> i32 {
-    return with_box_value(pointer, |v: &mut Vec<i32>| {
-        return v[index];
-    });
-}
-
-fn with_box_value<T: 'static, R, F: FnOnce(&mut T) -> R>(idx: usize, f: F) -> R {
-    return GLOBALS.with(|globals| {
-        let mut globals = globals.borrow_mut();
-        let value = globals[idx]
+    fn with_box_value<T: 'static, R, F: FnOnce(&mut T) -> R>(&self, idx: usize, f: F) -> Option<R> {
+        let mut pool = self.pool.lock().unwrap();
+        let value = pool
+            .get_mut(&idx)?
             .downcast_mut::<T>()
             .expect("Type mismatch in with_box_value");
-        return f(value);
+        return Some(f(value));
+    }
+
+    fn take_stdin(&self) -> ByteBuffer {
+        let mut stdin = self.stdin.lock().unwrap();
+        let data = mem::take(&mut *stdin);
+        return ByteBuffer::from_vec(data);
+    }
+
+    fn read_stdin_something(&self) -> Something {
+        let mut buffer = self.take_stdin();
+        return Something::deserialize(&mut buffer);
+    }
+
+    fn push_to_something_stack(&self, value: Something) {
+        let mut stack = self.something_stack.lock().unwrap();
+        stack.push(value);
+    }
+
+    fn pop_from_something_stack(&self) -> Option<Something> {
+        let mut stack = self.something_stack.lock().unwrap();
+        return stack.pop();
+    }
+}
+
+unsafe impl Send for GlobalPool {}
+unsafe impl Sync for GlobalPool {}
+
+static GLOBALS: LazyLock<GlobalPool> = LazyLock::new(|| GlobalPool::new());
+
+#[unsafe(no_mangle)]
+pub fn table_create() -> usize {
+    let table = storage::Table::new();
+    return GLOBALS.put_in_any_box(table);
+}
+
+#[unsafe(no_mangle)]
+pub fn table_get_something(table: usize, col: usize) -> Option<()> {
+    let key = GLOBALS.pop_from_something_stack()?;
+    let something = GLOBALS.with_box_value(table, |table: &mut Table| {
+        return table.get(&key).and_then(|row| {
+            return Some(row.get(col).clone());
+        });
+    })??;
+    GLOBALS.push_to_something_stack(something);
+    return Some(());
+}
+
+#[unsafe(no_mangle)]
+fn table_insert_from_stack(table: usize, col: usize) -> Option<()> {
+    let value = GLOBALS.pop_from_something_stack()?;
+    let key = GLOBALS.pop_from_something_stack()?;
+    return GLOBALS.with_box_value(table, |table: &mut storage::Table| {
+        table.insert_at(key, value, col);
     });
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::value::{Serializable, Something};
+#[unsafe(no_mangle)]
+pub fn something_push_i64_to_stack(value: i64) {
+    let something = Something::Int(value);
+    GLOBALS.push_to_something_stack(something);
+}
 
-    use super::*;
+#[unsafe(no_mangle)]
+pub fn something_pop_i64_from_stack() -> i64 {
+    return _something_pop_i64_from_stack().unwrap_or(-1);
+}
 
-    fn setup() -> storage::Table {
-        let mut store = storage::Table::new(false);
-        let v1 = Something::string("hello".into());
-        let k1 = Something::Int(10);
-        store.insert_at(k1.clone(), v1.clone(), 5);
-        let v2 = Something::string("world".into());
-        let k2 = Something::Int(20);
-        store.insert_at(k2.clone(), v2.clone(), 3);
-        let k3 = Something::Int(30);
-        store.insert_at(k3.clone(), v1.clone(), 5);
-
-        return store;
-    }
-
-    #[test]
-    fn it_works() {
-        let store = setup();
-        let k1 = Something::Int(10);
-        let value = store.get(&k1).map(|r| r.get(5));
-        let v1 = Something::string("hello".into());
-        assert_eq!(value, Some(&v1));
-        let value = store.get(&Something::Int(-1));
-        assert_eq!(value, None);
-    }
-
-    #[test]
-    fn test_rows_with() {
-        let store = setup();
-        let rows = store.rows_with(|r| {
-            return r.get(5) == &Something::string("hello".into());
-        });
-
-        assert_eq!(rows.count(), 2);
-    }
-
-    #[test]
-    fn test_ordering() {
-        let store = setup();
-        let range = store.get_range(&Something::Int(15), &Something::Int(35));
-        assert!(range.count() > 1);
-    }
-
-    #[test]
-    fn test_replication() {
-        let mut store = setup();
-        let ops = store.take_ops();
-        let store2 = storage::Table::from_ops(ops);
-        let h1 = store.tree_hash();
-        let h2 = store2.tree_hash();
-        assert_eq!(h1, h2);
-    }
-
-    #[test]
-    fn serialization_test() {
-        let store = setup();
-        let row = store.get(&Something::Int(10)).unwrap();
-        let mut buffer = value::ByteBuffer::new();
-        row.serialize(&mut buffer);
-        buffer.reset();
-        let deserialized = storage::Row::deserialize(&mut buffer);
-        assert_eq!(row, &deserialized);
-    }
+fn _something_pop_i64_from_stack() -> Option<i64> {
+    let something = GLOBALS.pop_from_something_stack()?;
+    if let Something::Int(v) = something {
+        return Some(v);
+    } else {
+        return None;
+    };
 }

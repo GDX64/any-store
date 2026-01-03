@@ -121,6 +121,33 @@ impl ByteBuffer {
         }
     }
 
+    pub fn from_vec(data: Vec<u8>) -> Self {
+        ByteBuffer {
+            buffer: data,
+            position: 0,
+        }
+    }
+
+    pub fn read_u8(&mut self) -> u8 {
+        let byte = self.buffer[self.position];
+        self.position += 1;
+        byte
+    }
+
+    pub fn write_u8(&mut self, value: u8) {
+        self.buffer.push(value);
+    }
+
+    pub fn read_i64(&mut self) -> i64 {
+        let bytes = &self.buffer[self.position..self.position + 8];
+        self.position += 8;
+        i64::from_le_bytes(bytes.try_into().unwrap())
+    }
+
+    pub fn write_i64(&mut self, value: i64) {
+        self.buffer.extend_from_slice(&value.to_le_bytes());
+    }
+
     pub fn reset(&mut self) {
         self.position = 0;
     }

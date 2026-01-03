@@ -46,12 +46,12 @@ pub struct Table {
 }
 
 impl Table {
-    pub fn new(is_replica: bool) -> Self {
+    pub fn new() -> Self {
         Table {
             items: BTreeMap::new(),
             ops: Vec::new(),
             version_counter: 0,
-            is_replica,
+            is_replica: false,
         }
     }
 
@@ -80,7 +80,8 @@ impl Table {
     }
 
     pub fn from_ops(ops: Vec<StorageOp>) -> Self {
-        let mut table = Table::new(true);
+        let mut table = Table::new();
+        table.is_replica = true;
         table.apply_ops(ops);
         return table;
     }
@@ -198,7 +199,7 @@ impl Serializable for Table {
         if !is_table {
             panic!("Expected TABLE_TAG in Table deserialization");
         }
-        let mut table = Table::new(false);
+        let mut table = Table::new();
         let num_items_bytes = buffer.read_bytes(8);
         let num_items = u64::from_le_bytes(num_items_bytes.try_into().unwrap()) as usize;
         for _ in 0..num_items {
