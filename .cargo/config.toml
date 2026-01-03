@@ -1,0 +1,3 @@
+[build]
+rustflags = ["-Ctarget-feature=+atomics"]
+target = "wasm32-unknown-unknown"

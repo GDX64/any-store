@@ -1,5 +1,11 @@
 use std::hash::Hash;
 
+const INT_TAG: u8 = 0;
+const VALUE_STRING_TAG: u8 = 1;
+const NULL_TAG: u8 = 2;
+pub const ROW_TAG: u8 = 3;
+pub const TABLE_TAG: u8 = 4;
+
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Something {
     Int(i64),
@@ -11,9 +17,9 @@ impl Something {
     pub fn tag(&self) -> u8 {
         use Something::*;
         match self {
-            Int(_) => 0,
-            ValueString(_) => 1,
-            Null => 2,
+            Int(_) => INT_TAG,
+            ValueString(_) => VALUE_STRING_TAG,
+            Null => NULL_TAG,
         }
     }
 
@@ -68,8 +74,8 @@ impl Serializable for Something {
             }
             ValueString(v) => {
                 let bytes = v.as_bytes();
-                let len = bytes.len() as u64;
-                buffer.write_bytes(&len.to_le_bytes());
+                let len = bytes.len() as u8;
+                buffer.write_bytes(&[len]);
                 buffer.write_bytes(bytes);
             }
             Null => {}
@@ -79,19 +85,19 @@ impl Serializable for Something {
     fn deserialize(buffer: &mut ByteBuffer) -> Self {
         let tag = buffer.read_bytes(1)[0];
         match tag {
-            0 => {
+            INT_TAG => {
                 let int_bytes = buffer.read_bytes(8);
                 let int_value = i64::from_le_bytes(int_bytes.try_into().unwrap());
                 Something::Int(int_value)
             }
-            1 => {
-                let len_bytes = buffer.read_bytes(8);
-                let len = u64::from_le_bytes(len_bytes.try_into().unwrap()) as usize;
+            VALUE_STRING_TAG => {
+                let len_bytes = buffer.read_bytes(1);
+                let len = len_bytes[0] as usize;
                 let str_bytes = buffer.read_bytes(len);
                 let text_value = String::from_utf8(str_bytes.to_vec()).unwrap();
                 Something::ValueString(ValueString::new(&text_value))
             }
-            2 => Something::Null,
+            NULL_TAG => Something::Null,
             _ => panic!("Unknown tag in Something deserialization"),
         }
     }
@@ -113,6 +119,10 @@ impl ByteBuffer {
             buffer: Vec::new(),
             position: 0,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.position = 0;
     }
 
     pub fn write_bytes(&mut self, data: &[u8]) {

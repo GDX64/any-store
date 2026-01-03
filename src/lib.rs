@@ -49,7 +49,7 @@ fn with_box_value<T: 'static, R, F: FnOnce(&mut T) -> R>(idx: usize, f: F) -> R 
 
 #[cfg(test)]
 mod tests {
-    use crate::value::Something;
+    use crate::value::{Serializable, Something};
 
     use super::*;
 
@@ -103,5 +103,16 @@ mod tests {
         let h1 = store.tree_hash();
         let h2 = store2.tree_hash();
         assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn serialization_test() {
+        let store = setup();
+        let row = store.get(&Something::Int(10)).unwrap();
+        let mut buffer = value::ByteBuffer::new();
+        row.serialize(&mut buffer);
+        buffer.reset();
+        let deserialized = storage::Row::deserialize(&mut buffer);
+        assert_eq!(row, &deserialized);
     }
 }

@@ -1,4 +1,4 @@
-use crate::value::Something;
+use crate::value::{ROW_TAG, Serializable, Something, TABLE_TAG};
 use std::{collections::BTreeMap, hash::Hash};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -167,5 +167,55 @@ impl Table {
 
     pub fn len(&self) -> usize {
         return self.items.len();
+    }
+}
+
+impl Serializable for Row {
+    fn deserialize(buffer: &mut crate::value::ByteBuffer) -> Self {
+        let len_bytes = buffer.read_bytes(8);
+        let len = u64::from_le_bytes(len_bytes.try_into().unwrap()) as usize;
+        let mut row = Row::new();
+        for _ in 0..len {
+            let value = Something::deserialize(buffer);
+            row.values.push(value);
+        }
+        return row;
+    }
+
+    fn serialize(&self, buffer: &mut crate::value::ByteBuffer) {
+        let len = self.values.len() as u64;
+        buffer.write_bytes(&[ROW_TAG]);
+        buffer.write_bytes(&len.to_le_bytes());
+        for v in &self.values {
+            v.serialize(buffer);
+        }
+    }
+}
+
+impl Serializable for Table {
+    fn deserialize(buffer: &mut crate::value::ByteBuffer) -> Self {
+        let is_table = buffer.read_bytes(1)[0] == TABLE_TAG;
+        if !is_table {
+            panic!("Expected TABLE_TAG in Table deserialization");
+        }
+        let mut table = Table::new(false);
+        let num_items_bytes = buffer.read_bytes(8);
+        let num_items = u64::from_le_bytes(num_items_bytes.try_into().unwrap()) as usize;
+        for _ in 0..num_items {
+            let key = Something::deserialize(buffer);
+            let row = Row::deserialize(buffer);
+            table.items.insert(key, row);
+        }
+        return table;
+    }
+
+    fn serialize(&self, buffer: &mut crate::value::ByteBuffer) {
+        buffer.write_bytes(&[TABLE_TAG]);
+        let num_items = self.items.len() as u64;
+        buffer.write_bytes(&num_items.to_le_bytes());
+        for (k, v) in &self.items {
+            k.serialize(buffer);
+            v.serialize(buffer);
+        }
     }
 }
