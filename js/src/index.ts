@@ -44,10 +44,7 @@ async function main() {
   wdb.somethingPushI64ToStack(123n);
   wdb.tableGetSomething(tableID, 1);
   const resultID = wdb.somethingPopStringFromStack();
-  const resultPointer = wdb.stringGetPointer(resultID);
-  console.log("stringID:", resultID, resultPointer);
-  const resultString = memory.buffer.slice(resultPointer, resultPointer + 11);
-  const decodedString = new TextDecoder().decode(resultString);
+  const decodedString = wdb.getString(resultID);
   console.log("result string:", decodedString); // should be "hello world"
 }
 
@@ -107,6 +104,17 @@ class WDB {
     arr.set(strBytes, stringPtr);
     return stringID;
   }
+
+  getString(stringID: number): string {
+    const length = this.stringGetLength(stringID);
+    const pointer = this.stringGetPointer(stringID);
+    const bytes = new Uint8Array(this.memory.buffer, pointer, length);
+    return new TextDecoder().decode(bytes);
+  }
+
+  stringGetLength(stringID: number): number {
+    return this.exports.string_get_length(stringID);
+  }
 }
 
 interface ExportsInterface {
@@ -119,4 +127,5 @@ interface ExportsInterface {
   table_create(): number;
   table_insert_from_stack(tableID: number, col: number): void;
   table_get_something(tableID: number, col: number): void;
+  string_get_length(stringID: number): number;
 }

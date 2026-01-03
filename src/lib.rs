@@ -151,11 +151,23 @@ fn something_push_string(str_idx: usize) -> Option<()> {
 }
 
 #[unsafe(no_mangle)]
-fn something_pop_string_from_stack() -> usize {
+fn something_pop_string_from_stack() -> i32 {
     let something = GLOBALS.pop_from_something_stack();
     if let Some(Something::String(s)) = something {
-        return GLOBALS.create_string(s);
+        return GLOBALS.create_string(s) as i32;
     } else {
-        return usize::MAX;
+        return -1;
+    }
+}
+
+#[unsafe(no_mangle)]
+fn string_get_length(str_idx: usize) -> i32 {
+    let s = GLOBALS.get_string(str_idx);
+    if let Some(s) = s {
+        let len = s.len();
+        GLOBALS.create_string(s); // put it back
+        return len as i32;
+    } else {
+        return -1;
     }
 }
