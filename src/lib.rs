@@ -6,27 +6,23 @@ pub mod wasm;
 use std::{
     any::Any,
     collections::BTreeMap,
-    mem,
     sync::{LazyLock, Mutex},
 };
 
-use crate::{
-    storage::Table,
-    value::{ByteBuffer, Serializable, Something},
-};
+use crate::{storage::Table, value::Something};
 
 struct GlobalPool {
     pool: Mutex<BTreeMap<usize, Box<dyn Any>>>,
-    stdin: Mutex<Vec<u8>>,
     something_stack: Mutex<Vec<Something>>,
+    string_pool: Mutex<BTreeMap<usize, String>>,
 }
 
 impl GlobalPool {
     fn new() -> Self {
         GlobalPool {
             pool: Mutex::new(BTreeMap::new()),
-            stdin: Mutex::new(Vec::new()),
             something_stack: Mutex::new(Vec::new()),
+            string_pool: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -50,15 +46,20 @@ impl GlobalPool {
         return Some(f(value));
     }
 
-    fn take_stdin(&self) -> ByteBuffer {
-        let mut stdin = self.stdin.lock().unwrap();
-        let data = mem::take(&mut *stdin);
-        return ByteBuffer::from_vec(data);
+    fn get_string(&self, str_idx: usize) -> Option<String> {
+        let string_pool = self.string_pool.lock().unwrap();
+        return string_pool.get(&str_idx).cloned();
     }
 
-    fn read_stdin_something(&self) -> Something {
-        let mut buffer = self.take_stdin();
-        return Something::deserialize(&mut buffer);
+    fn create_string(&self, value: String) -> usize {
+        let mut string_pool = self.string_pool.lock().unwrap();
+        let new_key = if let Some((&key, _)) = string_pool.last_key_value() {
+            key + 1
+        } else {
+            0
+        };
+        string_pool.insert(new_key, value);
+        return new_key;
     }
 
     fn push_to_something_stack(&self, value: Something) {
@@ -122,4 +123,26 @@ fn _something_pop_i64_from_stack() -> Option<i64> {
     } else {
         return None;
     };
+}
+
+#[unsafe(no_mangle)]
+fn string_create(len: usize) -> usize {
+    let s = String::from_utf8(vec![0u8; len]).unwrap();
+    return GLOBALS.create_string(s);
+}
+
+#[unsafe(no_mangle)]
+fn get_string_pointer(str_idx: usize) -> *const u8 {
+    let s = GLOBALS
+        .with_box_value::<String, _, _>(str_idx, |s| s.as_ptr())
+        .unwrap();
+    return s;
+}
+
+#[unsafe(no_mangle)]
+fn something_push_string(str_idx: usize) -> Option<()> {
+    let s = GLOBALS.get_string(str_idx)?;
+    let something = Something::String(s);
+    GLOBALS.push_to_something_stack(something);
+    return Some(());
 }
