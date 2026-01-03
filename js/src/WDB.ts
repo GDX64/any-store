@@ -83,8 +83,9 @@ export class WDB {
     return new WDB(instance, memory);
   }
 
-  createTable() {
-    return this.ops.createTable();
+  createTable<T extends ColMap>(colMap: T): Table<T> {
+    const id = this.ops.createTable();
+    return new Table<T>(colMap, id, this);
   }
 
   insertOnTable(
@@ -93,13 +94,13 @@ export class WDB {
     key: Something,
     value: Something
   ) {
-    this.putSomethingOnStack(key);
-    this.putSomethingOnStack(value);
+    this.ops.putSomethingOnStack(key);
+    this.ops.putSomethingOnStack(value);
     this.ops.tableInsertFromStack(tableID, col);
   }
 
   getFromTable(tableID: number, key: Something, col: number): Something | null {
-    this.putSomethingOnStack(key);
+    this.ops.putSomethingOnStack(key);
     this.ops.tableGetSomething(tableID, col);
     const id = this.ops.somethingPopFromStack();
     if (id > 0) {
@@ -108,14 +109,6 @@ export class WDB {
       return something;
     }
     return null;
-  }
-
-  private putSomethingOnStack(value: Something) {
-    if (value.tag === "i64") {
-      this.ops.somethingPushI64ToStack(value.value);
-    } else if (value.tag === "string") {
-      this.ops.pushStringToStack(value.value);
-    }
   }
 
   static i64(value: bigint): Something {
@@ -133,6 +126,27 @@ export class WDB {
       return WDB.string(value);
     }
     return null;
+  }
+}
+
+type ColMap = Record<string, Something["tag"]>;
+
+class Table<T extends ColMap> {
+  colMap: Map<string, number> = new Map();
+  constructor(colMap: T, private id: number, private wdb: WDB) {
+    Object.keys(colMap).forEach((colName, index) => {
+      this.colMap.set(colName, index);
+    });
+  }
+
+  insert(colName: keyof T, key: Something, value: Something) {
+    const col = this.colMap.get(colName as string);
+    this.wdb.insertOnTable(this.id, col!, key, value);
+  }
+
+  get(colName: keyof T, key: Something): Something | null {
+    const col = this.colMap.get(colName as string);
+    return this.wdb.getFromTable(this.id, key, col!);
   }
 }
 
@@ -168,6 +182,14 @@ class Ops {
 
   createTable() {
     return this.exports.table_create();
+  }
+
+  putSomethingOnStack(value: Something) {
+    if (value.tag === "i64") {
+      this.somethingPushI64ToStack(value.value);
+    } else if (value.tag === "string") {
+      this.pushStringToStack(value.value);
+    }
   }
 
   somethingPushI64ToStack(value: bigint): void {
