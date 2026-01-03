@@ -1,4 +1,4 @@
-use std::{any::Any, cell::RefCell};
+use std::{any::Any, cell::RefCell, sync::Mutex};
 
 mod storage;
 mod value;
@@ -6,6 +6,20 @@ mod wasm;
 
 thread_local! {
     static GLOBALS: RefCell<Vec<Box<dyn Any>>> = RefCell::new(Vec::new());
+}
+
+static GLOBAL_VAR: Mutex<i32> = Mutex::new(0);
+
+#[unsafe(no_mangle)]
+pub fn set_global_var(value: i32) {
+    let mut gv = GLOBAL_VAR.lock().unwrap();
+    *gv = value;
+}
+
+#[unsafe(no_mangle)]
+pub fn get_global_var() -> i32 {
+    let gv = GLOBAL_VAR.lock().unwrap();
+    *gv
 }
 
 #[unsafe(no_mangle)]

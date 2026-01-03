@@ -1,3 +1,8 @@
 [build]
-rustflags = ["-Ctarget-feature=+atomics"]
+rustflags = [
+  "-C", "target-feature=+atomics,+bulk-memory",
+  "-C", "link-arg=--shared-memory",
+  "-C", "link-arg=--max-memory=1073741824",
+  "-C", "link-arg=--import-memory",
+]
 target = "wasm32-unknown-unknown"
