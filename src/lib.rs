@@ -125,6 +125,30 @@ pub fn something_pop_i64_from_stack() -> i64 {
     return _something_pop_i64_from_stack().unwrap_or(-1);
 }
 
+#[unsafe(no_mangle)]
+pub fn something_pop_from_stack() -> i32 {
+    let Some(value) = GLOBALS.pop_from_something_stack() else {
+        return -1;
+    };
+    match value {
+        Something::Int(v) => {
+            let id = safe_next_id();
+            safe_put_i64(id, v);
+            return id as i32;
+        }
+        Something::String(s) => {
+            let string_id = safe_create_string();
+            for byte in s.as_bytes() {
+                safe_push_to_string(string_id, *byte);
+            }
+            return string_id as i32;
+        }
+        Something::Null => {
+            return -1;
+        }
+    }
+}
+
 fn _something_pop_i64_from_stack() -> Option<i64> {
     let something = GLOBALS.pop_from_something_stack()?;
     if let Something::Int(v) = something {
@@ -183,9 +207,10 @@ unsafe extern "C" {
     // unsafe fn log_message(ptr: *const u8, len: usize);
 
     unsafe fn js_read_string(id: usize, index: usize) -> u8;
-    unsafe fn js_create_string() -> usize;
     unsafe fn js_push_to_string(string_id: usize, byte: u8);
     unsafe fn js_read_string_length(id: usize) -> usize;
+    unsafe fn js_next_id() -> usize;
+    unsafe fn js_put_i64(id: usize, value: i64);
 }
 
 fn safe_read_string(id: usize, index: usize) -> u8 {
@@ -197,7 +222,7 @@ fn safe_read_string(id: usize, index: usize) -> u8 {
 
 fn safe_create_string() -> usize {
     unsafe {
-        let id = js_create_string();
+        let id = js_next_id();
         return id;
     }
 }
@@ -212,5 +237,18 @@ fn safe_read_string_length(id: usize) -> usize {
     unsafe {
         let len = js_read_string_length(id);
         return len;
+    }
+}
+
+fn safe_put_i64(id: usize, value: i64) {
+    unsafe {
+        js_put_i64(id, value);
+    }
+}
+
+fn safe_next_id() -> usize {
+    unsafe {
+        let id = js_next_id();
+        return id;
     }
 }
