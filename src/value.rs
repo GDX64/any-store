@@ -13,6 +13,12 @@ pub enum Something {
     Null,
 }
 
+impl Default for Something {
+    fn default() -> Self {
+        Something::Null
+    }
+}
+
 impl Something {
     pub fn tag(&self) -> u8 {
         use Something::*;

@@ -38,17 +38,21 @@ impl GlobalPool {
     }
 
     fn with_box_value<T: 'static, R, F: FnOnce(&mut T) -> R>(&self, idx: usize, f: F) -> Option<R> {
-        let mut pool = self.pool.lock().unwrap();
-        let value = pool
-            .get_mut(&idx)?
-            .downcast_mut::<T>()
-            .expect("Type mismatch in with_box_value");
+        let mut pool = self.pool.lock().ok()?;
+        let value = pool.get_mut(&idx)?.downcast_mut::<T>()?;
         return Some(f(value));
     }
 
-    fn get_string(&self, str_idx: usize) -> Option<String> {
+    fn get_string_pointer(&self, str_idx: usize) -> Option<*const u8> {
         let string_pool = self.string_pool.lock().unwrap();
-        return string_pool.get(&str_idx).cloned();
+        let v = string_pool.get(&str_idx).map(|s| s.as_ptr());
+        return v;
+    }
+
+    fn get_string(&self, str_idx: usize) -> Option<String> {
+        let mut string_pool = self.string_pool.lock().ok()?;
+        let v = string_pool.remove(&str_idx);
+        return v;
     }
 
     fn create_string(&self, value: String) -> usize {
@@ -62,13 +66,14 @@ impl GlobalPool {
         return new_key;
     }
 
-    fn push_to_something_stack(&self, value: Something) {
-        let mut stack = self.something_stack.lock().unwrap();
+    fn push_to_something_stack(&self, value: Something) -> Option<()> {
+        let mut stack = self.something_stack.lock().ok()?;
         stack.push(value);
+        return Some(());
     }
 
     fn pop_from_something_stack(&self) -> Option<Something> {
-        let mut stack = self.something_stack.lock().unwrap();
+        let mut stack = self.something_stack.lock().ok()?;
         return stack.pop();
     }
 }
@@ -132,10 +137,8 @@ fn string_create(len: usize) -> usize {
 }
 
 #[unsafe(no_mangle)]
-fn get_string_pointer(str_idx: usize) -> *const u8 {
-    let s = GLOBALS
-        .with_box_value::<String, _, _>(str_idx, |s| s.as_ptr())
-        .unwrap();
+fn string_get_pointer(str_idx: usize) -> *const u8 {
+    let s = GLOBALS.get_string_pointer(str_idx).unwrap();
     return s;
 }
 
@@ -145,4 +148,14 @@ fn something_push_string(str_idx: usize) -> Option<()> {
     let something = Something::String(s);
     GLOBALS.push_to_something_stack(something);
     return Some(());
+}
+
+#[unsafe(no_mangle)]
+fn something_pop_string_from_stack() -> usize {
+    let something = GLOBALS.pop_from_something_stack();
+    if let Some(Something::String(s)) = something {
+        return GLOBALS.create_string(s);
+    } else {
+        return usize::MAX;
+    }
 }
