@@ -1,8 +1,10 @@
-[build]
+[target.wasm32-unknown-unknown]
 rustflags = [
   "-C", "target-feature=+atomics,+bulk-memory",
   "-C", "link-arg=--shared-memory",
   "-C", "link-arg=--max-memory=1073741824",
   "-C", "link-arg=--import-memory",
 ]
-target = "wasm32-unknown-unknown"
+
+[alias]
+wasm = "build --release --target=wasm32-unknown-unknown" 
