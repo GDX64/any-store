@@ -1,9 +1,10 @@
 import { bench, describe } from "vitest";
 import { WDB } from "../src/WDB";
+import { DatabaseSync } from "node:sqlite";
 import fs from "fs";
 const wasmPath = "../target/wasm32-unknown-unknown/release/any_store.wasm";
 
-describe("benchmarks", async () => {
+describe("benchmarks inserts", async () => {
   const data = fs.readFileSync(wasmPath);
   const mockData = Array.from({ length: 10_000 }, (_, i) => {
     return {
@@ -43,12 +44,41 @@ describe("benchmarks", async () => {
     () => {
       const map = new Map<number, any>();
       mockData.forEach((item, index) => {
-        map.set(index, {
-          name: item.name.value,
-          age: item.age.value,
-          height: item.height.value,
-        });
+        map.set(
+          index,
+          structuredClone({
+            name: item.name.value,
+            age: item.age.value,
+            height: item.height.value,
+          })
+        );
       });
+    },
+    {
+      time: 100,
+    }
+  );
+
+  const sqliteDB = new DatabaseSync(":memory:");
+  let count = 0;
+  bench(
+    "insert on sqlite",
+    () => {
+      count++;
+      const tableName = `test_${count}`;
+      sqliteDB.exec(`pragma journal_mode = WAL;`);
+      sqliteDB.exec(
+        `CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY, name TEXT, age INTEGER, height REAL);`
+      );
+      // Wrap all inserts in a single transaction
+      sqliteDB.exec("BEGIN TRANSACTION");
+      const stmt = sqliteDB.prepare(
+        `INSERT INTO ${tableName} (id, name, age, height) VALUES (?, ?, ?, ?);`
+      );
+      mockData.forEach((item, index) => {
+        stmt.run(index, item.name.value, item.age.value, item.height.value);
+      });
+      sqliteDB.exec("COMMIT");
     },
     {
       time: 100,
