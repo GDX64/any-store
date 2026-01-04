@@ -13,12 +13,12 @@ async function main() {
     height: "f64",
   });
   const k1 = WDB.i32(123);
-  table.insert("name", k1, WDB.string("Alice"));
-  table.insert("age", k1, WDB.i32(30));
-  table.insert("height", k1, WDB.f64(1.75));
-  const val1 = table.get("name", k1);
-  const val2 = table.get("age", k1);
-  const val3 = table.get("height", k1);
+  table.insert(k1, WDB.string("Alice"), "name");
+  table.insert(k1, WDB.i32(30), "age");
+  table.insert(k1, WDB.f64(1.75), "height");
+  const val1 = table.get(k1, "name");
+  const val2 = table.get(k1, "age");
+  const val3 = table.get(k1, "height");
   console.log("Got value for key 123:", val1, val2, val3);
 }
 

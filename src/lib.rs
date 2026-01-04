@@ -14,7 +14,6 @@ use crate::{storage::Table, value::Something};
 struct GlobalPool {
     pool: RwLock<BTreeMap<usize, Box<dyn Any>>>,
     something_stack: RwLock<Vec<Something>>,
-    string_pool: RwLock<BTreeMap<usize, String>>,
 }
 
 impl GlobalPool {
@@ -22,7 +21,6 @@ impl GlobalPool {
         GlobalPool {
             pool: RwLock::new(BTreeMap::new()),
             something_stack: RwLock::new(Vec::new()),
-            string_pool: RwLock::new(BTreeMap::new()),
         }
     }
 
@@ -51,23 +49,6 @@ impl GlobalPool {
         let pool = self.pool.read().ok()?;
         let value = pool.get(&idx)?.downcast_ref::<T>()?;
         return Some(f(value));
-    }
-
-    fn take_string(&self, str_idx: usize) -> Option<String> {
-        let mut string_pool = self.string_pool.write().ok()?;
-        let v = string_pool.remove(&str_idx);
-        return v;
-    }
-
-    fn create_string(&self, value: String) -> usize {
-        let mut string_pool = self.string_pool.write().unwrap();
-        let new_key = if let Some((&key, _)) = string_pool.last_key_value() {
-            key + 1
-        } else {
-            0
-        };
-        string_pool.insert(new_key, value);
-        return new_key;
     }
 
     fn push_to_something_stack(&self, value: Something) -> Option<()> {
@@ -121,37 +102,39 @@ pub fn something_push_i32_to_stack(value: i32) {
 }
 
 #[unsafe(no_mangle)]
-pub fn something_pop_from_stack() -> i32 {
+pub fn something_pop_from_stack() {
     let Some(value) = GLOBALS.pop_from_something_stack() else {
-        return -1;
+        return;
     };
     match value {
         Something::Int(v) => {
-            let id = safe_next_id();
-            safe_put_i32(id, v);
-            return id as i32;
+            safe_put_i32(v);
         }
         Something::String(s) => {
-            let string_id = safe_create_string();
+            safe_create_string();
             for byte in s.as_bytes() {
-                safe_push_to_string(string_id, *byte);
+                safe_push_to_string(*byte);
             }
-            return string_id as i32;
         }
         Something::Null => {
-            return -1;
+            return;
         }
         Something::Float(f) => {
-            let id = safe_next_id();
-            safe_put_f64(id, f);
-            return id as i32;
+            safe_put_f64(f);
         }
     }
 }
 
 #[unsafe(no_mangle)]
-fn something_push_string(str_idx: usize) -> Option<()> {
-    let s = GLOBALS.take_string(str_idx)?;
+fn something_push_string() -> Option<()> {
+    let len = safe_read_string_length();
+    let mut bytes = Vec::with_capacity(len);
+    for i in 0..len {
+        let byte = safe_read_string(i);
+        bytes.push(byte);
+    }
+    safe_js_pop_stack();
+    let s = String::from_utf8(bytes).unwrap();
     let something = Something::String(s);
     GLOBALS.push_to_something_stack(something);
     return Some(());
@@ -163,96 +146,59 @@ fn something_push_f64_to_stack(value: f64) {
     GLOBALS.push_to_something_stack(something);
 }
 
-#[unsafe(no_mangle)]
-fn something_pop_string_from_stack() -> i32 {
-    let something = GLOBALS.pop_from_something_stack();
-    if let Some(Something::String(s)) = something {
-        return GLOBALS.create_string(s) as i32;
-    } else {
-        return -1;
-    }
-}
-
-#[unsafe(no_mangle)]
-fn string_load(id: usize) -> usize {
-    let len = safe_read_string_length(id);
-    let mut bytes = Vec::with_capacity(len);
-    for i in 0..len {
-        let byte = safe_read_string(id, i);
-        bytes.push(byte);
-    }
-    let s = String::from_utf8(bytes).unwrap();
-    return GLOBALS.create_string(s);
-}
-
-#[unsafe(no_mangle)]
-fn string_take(str_idx: usize) -> i32 {
-    let s = GLOBALS.take_string(str_idx);
-    if let Some(s) = s {
-        let string_id = safe_create_string();
-        for byte in s.as_bytes() {
-            safe_push_to_string(string_id, *byte);
-        }
-        return string_id as i32;
-    } else {
-        return -1;
-    }
-}
-
 #[link(wasm_import_module = "ops")]
 unsafe extern "C" {
     // unsafe fn log_message(ptr: *const u8, len: usize);
 
-    unsafe fn js_read_string(id: usize, index: usize) -> u8;
-    unsafe fn js_push_to_string(string_id: usize, byte: u8);
-    unsafe fn js_read_string_length(id: usize) -> usize;
-    unsafe fn js_next_id() -> usize;
-    unsafe fn js_put_i32(id: usize, value: i32);
-    unsafe fn js_put_f64(id: usize, value: f64);
+    unsafe fn js_read_string(index: usize) -> u8;
+    unsafe fn js_push_to_string(byte: u8);
+    unsafe fn js_read_string_length() -> usize;
+    unsafe fn js_pop_stack();
+    unsafe fn js_push_string_to_stack();
+    unsafe fn js_put_i32(value: i32);
+    unsafe fn js_put_f64(value: f64);
 }
 
-fn safe_read_string(id: usize, index: usize) -> u8 {
+fn safe_read_string(index: usize) -> u8 {
     unsafe {
-        let byte = js_read_string(id, index);
+        let byte = js_read_string(index);
         return byte;
     }
 }
 
-fn safe_create_string() -> usize {
+fn safe_create_string() {
     unsafe {
-        let id = js_next_id();
-        return id;
+        js_push_string_to_stack();
     }
 }
 
-fn safe_push_to_string(string_id: usize, byte: u8) {
+fn safe_push_to_string(byte: u8) {
     unsafe {
-        js_push_to_string(string_id, byte);
+        js_push_to_string(byte);
     }
 }
 
-fn safe_read_string_length(id: usize) -> usize {
+fn safe_read_string_length() -> usize {
     unsafe {
-        let len = js_read_string_length(id);
+        let len = js_read_string_length();
         return len;
     }
 }
 
-fn safe_put_i32(id: usize, value: i32) {
+fn safe_put_i32(value: i32) {
     unsafe {
-        js_put_i32(id, value);
+        js_put_i32(value);
     }
 }
 
-fn safe_next_id() -> usize {
+fn safe_put_f64(value: f64) {
     unsafe {
-        let id = js_next_id();
-        return id;
+        js_put_f64(value);
     }
 }
 
-fn safe_put_f64(id: usize, value: f64) {
+fn safe_js_pop_stack() {
     unsafe {
-        js_put_f64(id, value);
+        js_pop_stack();
     }
 }
