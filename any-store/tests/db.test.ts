@@ -1,12 +1,11 @@
 import fs from "fs";
 import { WDB } from "../src/WDB";
+import { describe, expect, test } from "vitest";
+const wasmPath = "../target/wasm32-unknown-unknown/release/any_store.wasm";
 
 describe("Database Module", () => {
   test("should initialize the database correctly", async () => {
-    const data = fs.readFileSync(
-      "../target/wasm32-unknown-unknown/release/any_store.wasm"
-    );
-
+    const data = fs.readFileSync(wasmPath);
     const wdb = await WDB.create(data);
     const table = wdb.createTable({
       name: "string",
