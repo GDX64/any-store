@@ -34,7 +34,7 @@ impl GlobalPool {
         return Some(f(value));
     }
 
-    fn with_box_value<R, F: FnOnce(&Table) -> R>(&self, idx: usize, f: F) -> Option<R> {
+    fn with_table<R, F: FnOnce(&Table) -> R>(&self, idx: usize, f: F) -> Option<R> {
         let pool = self.db.read().ok()?;
         let value = pool.get_table(idx)?;
         return Some(f(value));
@@ -65,7 +65,7 @@ pub fn table_create() -> usize {
 #[unsafe(no_mangle)]
 pub fn table_get_something(table: usize, col: usize) -> Option<()> {
     let key = GLOBALS.pop_from_something_stack()?;
-    let something = GLOBALS.with_box_value(table, |table: &Table| {
+    let something = GLOBALS.with_table(table, |table: &Table| {
         return table.get(&key).and_then(|row| {
             return Some(row.get(col).clone());
         });
