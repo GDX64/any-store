@@ -17,9 +17,10 @@ async function main() {
   table.insert(k1, WDB.i32(30), "age");
   table.insert(k1, WDB.f64(1.75), "height");
   table.insert(WDB.i32(0), WDB.string("Bob"), "name");
-  const val1 = table.get(k1, "name");
-  const val2 = table.get(k1, "age");
-  const val3 = table.get(k1, "height");
+  const row1 = table.row(k1);
+  const val1 = row1.get("name");
+  const val2 = row1.get("age");
+  const val3 = row1.get("height");
   console.log("Got value for key 123:", val1, val2, val3);
   console.log("Got value for key 0:", table.get(WDB.i32(0), "name"));
 }

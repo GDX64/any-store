@@ -150,6 +150,18 @@ class Table<T extends ColMap> {
     const col = this.colMap.get(colName as string);
     return this.wdb.getFromTable(this.id, key, col!);
   }
+
+  row(key: Something) {
+    return new Row<T>(this, key);
+  }
+}
+
+class Row<T extends ColMap> {
+  constructor(private table: Table<T>, private key: Something) {}
+
+  get<K extends keyof T>(colName: K): Something["value"] | null {
+    return this.table.get(this.key, colName);
+  }
 }
 
 export type Something =
