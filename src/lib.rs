@@ -3,51 +3,40 @@ mod tests;
 pub mod value;
 pub mod wasm;
 
-use std::{
-    any::Any,
-    collections::BTreeMap,
-    sync::{LazyLock, RwLock},
+use std::sync::{LazyLock, RwLock};
+
+use crate::{
+    storage::{Database, Table},
+    value::Something,
 };
 
-use crate::{storage::Table, value::Something};
-
 struct GlobalPool {
-    pool: RwLock<BTreeMap<usize, Box<dyn Any>>>,
+    db: RwLock<Database>,
     something_stack: RwLock<Vec<Something>>,
 }
 
 impl GlobalPool {
     fn new() -> Self {
         GlobalPool {
-            pool: RwLock::new(BTreeMap::new()),
+            db: RwLock::new(Database::new()),
             something_stack: RwLock::new(Vec::new()),
         }
     }
 
-    fn put_in_any_box<T: 'static>(&self, value: T) -> usize {
-        let mut pool = self.pool.write().unwrap();
-        let new_key = if let Some((&key, _)) = pool.last_key_value() {
-            key + 1
-        } else {
-            0
-        };
-        pool.insert(new_key, Box::new(value));
-        return new_key;
+    fn add_table(&self) -> usize {
+        let mut db = self.db.write().unwrap();
+        return db.create_table();
     }
 
-    fn with_box_value_mut<T: 'static, R, F: FnOnce(&mut T) -> R>(
-        &self,
-        idx: usize,
-        f: F,
-    ) -> Option<R> {
-        let mut pool = self.pool.write().ok()?;
-        let value = pool.get_mut(&idx)?.downcast_mut::<T>()?;
+    fn with_table_mut<R, F: FnOnce(&mut Table) -> R>(&self, idx: usize, f: F) -> Option<R> {
+        let mut pool = self.db.write().ok()?;
+        let value = pool.get_table_mut(idx)?;
         return Some(f(value));
     }
 
-    fn with_box_value<T: 'static, R, F: FnOnce(&T) -> R>(&self, idx: usize, f: F) -> Option<R> {
-        let pool = self.pool.read().ok()?;
-        let value = pool.get(&idx)?.downcast_ref::<T>()?;
+    fn with_box_value<R, F: FnOnce(&Table) -> R>(&self, idx: usize, f: F) -> Option<R> {
+        let pool = self.db.read().ok()?;
+        let value = pool.get_table(idx)?;
         return Some(f(value));
     }
 
@@ -70,8 +59,7 @@ static GLOBALS: LazyLock<GlobalPool> = LazyLock::new(|| GlobalPool::new());
 
 #[unsafe(no_mangle)]
 pub fn table_create() -> usize {
-    let table = storage::Table::new();
-    return GLOBALS.put_in_any_box(table);
+    return GLOBALS.add_table() as usize;
 }
 
 #[unsafe(no_mangle)]
@@ -90,7 +78,7 @@ pub fn table_get_something(table: usize, col: usize) -> Option<()> {
 fn table_insert_from_stack(table: usize, col: usize) -> Option<()> {
     let value = GLOBALS.pop_from_something_stack()?;
     let key = GLOBALS.pop_from_something_stack()?;
-    return GLOBALS.with_box_value_mut(table, |table: &mut storage::Table| {
+    return GLOBALS.with_table_mut(table, |table: &mut storage::Table| {
         table.insert_at(key, value, col);
     });
 }

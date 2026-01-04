@@ -37,6 +37,35 @@ impl Row {
     }
 }
 
+pub struct Database {
+    last_table_id: usize,
+    tables: BTreeMap<usize, Table>,
+}
+
+impl Database {
+    pub fn new() -> Self {
+        Database {
+            last_table_id: 0,
+            tables: BTreeMap::new(),
+        }
+    }
+
+    pub fn create_table(&mut self) -> usize {
+        self.last_table_id += 1;
+        let table_id = self.last_table_id;
+        self.tables.insert(table_id, Table::new());
+        return table_id;
+    }
+
+    pub fn get_table_mut(&mut self, table_id: usize) -> Option<&mut Table> {
+        return self.tables.get_mut(&table_id);
+    }
+
+    pub fn get_table(&self, table_id: usize) -> Option<&Table> {
+        return self.tables.get(&table_id);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Table {
     items: BTreeMap<Something, Row>,
