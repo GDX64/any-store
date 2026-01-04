@@ -31,6 +31,10 @@ function js_put_i32(id: number, value: number): void {
   jsHeap.set(id, value);
 }
 
+function js_put_f64(id: number, value: number): void {
+  jsHeap.set(id, value);
+}
+
 function js_push_to_string(stringID: number, byte: number): void {
   const str = jsHeap.get(stringID) ?? "";
   jsHeap.set(stringID, str + String.fromCharCode(byte));
@@ -71,6 +75,7 @@ export class WDB {
       },
       ops: {
         js_put_i32,
+        js_put_f64,
         js_next_id,
         js_create_string,
         js_push_to_string,
@@ -115,15 +120,25 @@ export class WDB {
     return { tag: "i32", value };
   }
 
+  static f64(value: number): Something {
+    return { tag: "f64", value };
+  }
+
   static string(value: string): Something {
     return { tag: "string", value };
   }
 
+  static null(): Something {
+    return { tag: "null", value: null };
+  }
+
   static somethinFromValue(value: any): Something | null {
     if (typeof value === "number") {
-      return WDB.i32(value);
+      return WDB.f64(value);
     } else if (typeof value === "string") {
       return WDB.string(value);
+    } else if (value === null) {
+      return { tag: "null", value: null };
     }
     return null;
   }
@@ -158,12 +173,23 @@ export type Something =
   | {
       tag: "string";
       value: string;
+    }
+  | {
+      tag: "null";
+      value: null;
+    }
+  | {
+      tag: "f64";
+      value: number;
     };
 
 interface ExportsInterface {
   something_push_i32_to_stack(value: number): void;
   something_pop_i32_from_stack(): number;
+  something_push_f64_to_stack(value: number): void;
+  something_pop_f64_from_stack(): number;
   something_pop_from_stack(): number;
+  something_push_null_to_stack(): void;
   something_push_string(stringID: number): void;
   something_pop_string_from_stack(): number;
   table_create(): number;
@@ -189,7 +215,19 @@ class Ops {
       this.somethingPushi32ToStack(value.value);
     } else if (value.tag === "string") {
       this.pushStringToStack(value.value);
+    } else if (value.tag === "f64") {
+      this.somethingPushf64ToStack(value.value);
+    } else if (value.tag === "null") {
+      this.pushNullToStack();
     }
+  }
+
+  pushNullToStack(): void {
+    this.exports.something_push_null_to_stack();
+  }
+
+  somethingPushf64ToStack(value: number): void {
+    this.exports.something_push_f64_to_stack(value);
   }
 
   somethingPushi32ToStack(value: number): void {

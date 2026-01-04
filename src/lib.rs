@@ -141,6 +141,11 @@ pub fn something_pop_from_stack() -> i32 {
         Something::Null => {
             return -1;
         }
+        Something::Float(f) => {
+            let id = safe_next_id();
+            safe_put_f64(id, f);
+            return id as i32;
+        }
     }
 }
 
@@ -150,6 +155,12 @@ fn something_push_string(str_idx: usize) -> Option<()> {
     let something = Something::String(s);
     GLOBALS.push_to_something_stack(something);
     return Some(());
+}
+
+#[unsafe(no_mangle)]
+fn something_push_f64_to_stack(value: f64) {
+    let something = Something::Float(value);
+    GLOBALS.push_to_something_stack(something);
 }
 
 #[unsafe(no_mangle)]
@@ -197,6 +208,7 @@ unsafe extern "C" {
     unsafe fn js_read_string_length(id: usize) -> usize;
     unsafe fn js_next_id() -> usize;
     unsafe fn js_put_i32(id: usize, value: i32);
+    unsafe fn js_put_f64(id: usize, value: f64);
 }
 
 fn safe_read_string(id: usize, index: usize) -> u8 {
@@ -236,5 +248,11 @@ fn safe_next_id() -> usize {
     unsafe {
         let id = js_next_id();
         return id;
+    }
+}
+
+fn safe_put_f64(id: usize, value: f64) {
+    unsafe {
+        js_put_f64(id, value);
     }
 }

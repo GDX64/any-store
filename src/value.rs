@@ -3,12 +3,14 @@ use std::hash::Hash;
 const INT_TAG: u8 = 0;
 const VALUE_STRING_TAG: u8 = 1;
 const NULL_TAG: u8 = 2;
-pub const ROW_TAG: u8 = 3;
-pub const TABLE_TAG: u8 = 4;
+const FLOAT_TAG: u8 = 3;
+pub const ROW_TAG: u8 = 4;
+pub const TABLE_TAG: u8 = 5;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Something {
     Int(i32),
+    Float(f64),
     String(String),
     Null,
 }
@@ -26,6 +28,7 @@ impl Something {
             Int(_) => INT_TAG,
             String(_) => VALUE_STRING_TAG,
             Null => NULL_TAG,
+            Float(_) => FLOAT_TAG,
         }
     }
 
@@ -45,6 +48,10 @@ impl Hash for Something {
             String(v) => {
                 v.hash(state);
             }
+            Float(v) => {
+                let bits = v.to_le_bytes();
+                bits.hash(state);
+            }
             Null => {}
         }
     }
@@ -56,11 +63,6 @@ impl Ord for Something {
         use Something::*;
         match (self, other) {
             (Int(a), Int(b)) => a.cmp(b),
-            // (Double(a), Double(b)) => a.partial_cmp(b).expect("Double values must be comparable"),
-            // (Double2(a), Double2(b)) => {
-            //     a.partial_cmp(b).expect("Double2 values must be comparable")
-            // }
-            // (Blob(a), Blob(b)) => a.cmp(b),
             (String(a), String(b)) => a.cmp(b),
             (Null, Null) => std::cmp::Ordering::Equal,
             (Null, _) => std::cmp::Ordering::Less,
@@ -84,6 +86,9 @@ impl Serializable for Something {
                 buffer.write_bytes(&[len]);
                 buffer.write_bytes(bytes);
             }
+            Float(v) => {
+                buffer.write_bytes(&v.to_le_bytes());
+            }
             Null => {}
         }
     }
@@ -104,6 +109,11 @@ impl Serializable for Something {
                 Something::String(text_value)
             }
             NULL_TAG => Something::Null,
+            FLOAT_TAG => {
+                let float_bytes = buffer.read_bytes(8);
+                let float_value = f64::from_le_bytes(float_bytes.try_into().unwrap());
+                Something::Float(float_value)
+            }
             _ => panic!("Unknown tag in Something deserialization"),
         }
     }
