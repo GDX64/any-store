@@ -91,13 +91,16 @@ export class WDB {
     this.ops.tableInsertFromStack(tableID, col);
   }
 
-  getFromTable(tableID: number, key: Something, col: number): Something | null {
+  getFromTable(
+    tableID: number,
+    key: Something,
+    col: number
+  ): Something["value"] | null {
     this.ops.putSomethingOnStack(key);
     this.ops.tableGetSomething(tableID, col);
     this.ops.somethingPopFromStack();
     const value = popObjectFromStack();
-    const something = WDB.somethinFromValue(value);
-    return something;
+    return value ?? null;
   }
 
   static i32(value: number): Something {
@@ -116,7 +119,7 @@ export class WDB {
     return { tag: "null", value: null };
   }
 
-  static somethinFromValue(value: any): Something | null {
+  static somethingFromValue(value: any): Something | null {
     if (typeof value === "number") {
       return WDB.f64(value);
     } else if (typeof value === "string") {
@@ -143,7 +146,7 @@ class Table<T extends ColMap> {
     this.wdb.insertOnTable(this.id, col!, key, value);
   }
 
-  get(key: Something, colName: keyof T): Something | null {
+  get(key: Something, colName: keyof T): Something["value"] | null {
     const col = this.colMap.get(colName as string);
     return this.wdb.getFromTable(this.id, key, col!);
   }
