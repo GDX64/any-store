@@ -26,4 +26,32 @@ describe("Database Module", () => {
     const row2 = table.row(WDB.i32(0));
     expect(row2.get("name")).toBe("Bob");
   });
+
+  const mockData = Array.from({ length: 100 }, (_, i) => {
+    return {
+      age: Math.round(Math.random() * 100),
+      height: Math.random() * 2,
+      name: `Name_${i}`,
+    };
+  });
+
+  test("insert random data", async () => {
+    const TABLES = 10;
+    const data = fs.readFileSync(wasmPath);
+    const wdb = await WDB.create(data);
+    for (let t = 0; t < TABLES; t++) {
+      const table = wdb.createTable({
+        name: "string",
+        age: "i32",
+        height: "f64",
+      });
+
+      mockData.forEach((item, index) => {
+        const key = WDB.i32(index);
+        table.insert(key, WDB.string(item.name), "name");
+        table.insert(key, WDB.i32(item.age), "age");
+        table.insert(key, WDB.f64(item.height), "height");
+      });
+    }
+  });
 });

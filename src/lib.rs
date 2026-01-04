@@ -58,6 +58,28 @@ unsafe impl Sync for GlobalPool {}
 static GLOBALS: LazyLock<GlobalPool> = LazyLock::new(|| GlobalPool::new());
 
 #[unsafe(no_mangle)]
+pub fn start() {
+    log_string("started wasm module");
+    std::panic::set_hook(Box::new(|info| {
+        log_string("panic hook called");
+        let msg = if let Some(s) = info.payload().downcast_ref::<&str>() {
+            *s
+        } else if let Some(s) = info.payload().downcast_ref::<String>() {
+            s.as_str()
+        } else {
+            "Unknown panic message"
+        };
+        let location = if let Some(location) = info.location() {
+            format!(" at {}:{}", location.file(), location.line())
+        } else {
+            String::from("")
+        };
+        let full_message = format!("Panic occurred: {}{}", msg, location);
+        log_string(&full_message);
+    }));
+}
+
+#[unsafe(no_mangle)]
 pub fn table_create() -> usize {
     return GLOBALS.add_table() as usize;
 }
@@ -94,23 +116,7 @@ pub fn something_pop_from_stack() {
     let Some(value) = GLOBALS.pop_from_something_stack() else {
         return;
     };
-    match value {
-        Something::Int(v) => {
-            safe_put_i32(v);
-        }
-        Something::String(s) => {
-            safe_create_string();
-            for byte in s.as_bytes() {
-                safe_push_to_string(*byte);
-            }
-        }
-        Something::Null => {
-            return;
-        }
-        Something::Float(f) => {
-            safe_put_f64(f);
-        }
-    }
+    add_something_to_js_stack(&value);
 }
 
 #[unsafe(no_mangle)]
@@ -134,6 +140,26 @@ fn something_push_f64_to_stack(value: f64) {
     GLOBALS.push_to_something_stack(something);
 }
 
+fn add_something_to_js_stack(value: &Something) {
+    match value {
+        Something::Int(v) => {
+            safe_put_i32(*v);
+        }
+        Something::String(s) => {
+            safe_create_string();
+            for byte in s.as_bytes() {
+                safe_push_to_string(*byte);
+            }
+        }
+        Something::Null => {
+            return;
+        }
+        Something::Float(f) => {
+            safe_put_f64(*f);
+        }
+    }
+}
+
 #[link(wasm_import_module = "ops")]
 unsafe extern "C" {
     // unsafe fn log_message(ptr: *const u8, len: usize);
@@ -145,6 +171,7 @@ unsafe extern "C" {
     unsafe fn js_push_string_to_stack();
     unsafe fn js_put_i32(value: i32);
     unsafe fn js_put_f64(value: f64);
+    unsafe fn js_log_stack_value();
 }
 
 fn safe_read_string(index: usize) -> u8 {
@@ -189,4 +216,18 @@ fn safe_js_pop_stack() {
     unsafe {
         js_pop_stack();
     }
+}
+
+fn safe_log_stack_value() {
+    unsafe {
+        js_log_stack_value();
+    }
+}
+
+fn log_string(message: &str) {
+    safe_create_string();
+    for byte in message.as_bytes() {
+        safe_push_to_string(*byte);
+    }
+    safe_log_stack_value();
 }

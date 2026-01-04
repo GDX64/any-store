@@ -21,6 +21,11 @@ function js_push_string_to_stack() {
   jsStack.push("");
 }
 
+function js_log_stack_value(): void {
+  const val = jsStack.pop();
+  console.log("WASM LOG:", val);
+}
+
 function js_push_to_string(byte: number): void {
   jsStack[jsStack.length - 1] += String.fromCharCode(byte);
 }
@@ -53,7 +58,7 @@ export class WDB {
   static async create(data: BufferSource) {
     const memory = new WebAssembly.Memory({
       initial: 20,
-      maximum: 40,
+      maximum: 10_000,
       shared: true,
     });
     const importObj = {
@@ -68,11 +73,16 @@ export class WDB {
         js_read_string,
         js_pop_stack,
         js_push_string_to_stack,
+        js_log_stack_value,
       },
     };
     const res = await WebAssembly.instantiate(data, importObj);
     const { instance } = res;
     return new WDB(instance, memory);
+  }
+
+  memSize() {
+    return this.memory.buffer.byteLength;
   }
 
   createTable<T extends ColMap>(colMap: T): Table<T> {
@@ -113,6 +123,10 @@ export class WDB {
 
   static string(value: string): Something {
     return { tag: "string", value };
+  }
+
+  static stack() {
+    return jsStack;
   }
 
   static null(): Something {
@@ -194,10 +208,13 @@ interface ExportsInterface {
   table_insert_from_stack(tableID: number, col: number): void;
   table_get_something(tableID: number, col: number): void;
   string_take(strIdx: number): number;
+  start(): void;
 }
 
 class Ops {
-  constructor(private instance: WebAssembly.Instance) {}
+  constructor(private instance: WebAssembly.Instance) {
+    this.exports.start();
+  }
 
   get exports(): ExportsInterface {
     return this.instance.exports as unknown as ExportsInterface;

@@ -72,6 +72,7 @@ pub struct Table {
     ops: Vec<StorageOp>,
     version_counter: u64,
     is_replica: bool,
+    replicate: bool,
 }
 
 impl Table {
@@ -81,6 +82,7 @@ impl Table {
             ops: Vec::new(),
             version_counter: 0,
             is_replica: false,
+            replicate: false,
         }
     }
 
@@ -152,19 +154,21 @@ impl Table {
     }
 
     fn push_op(&mut self, op: StorageOp) {
-        if !self.is_replica {
+        if !self.is_replica && self.replicate {
             self.ops.push(op);
         }
     }
 
     pub fn insert_at(&mut self, key: Something, value: Something, index: usize) {
         let version = self.next_version();
-        self.push_op(StorageOp::Insert {
-            key: key.clone(),
-            value: value.clone(),
-            index,
-            version,
-        });
+        if self.replicate {
+            self.push_op(StorageOp::Insert {
+                key: key.clone(),
+                value: value.clone(),
+                index,
+                version,
+            });
+        }
         let e = self.items.entry(key);
         let row = e.or_insert_with(Row::new);
         row.insert_at(value, index);
@@ -173,10 +177,12 @@ impl Table {
     pub fn remove(&mut self, key: &Something) {
         let version = self.next_version();
 
-        self.push_op(StorageOp::Remove {
-            key: key.clone(),
-            version,
-        });
+        if self.replicate {
+            self.push_op(StorageOp::Remove {
+                key: key.clone(),
+                version,
+            });
+        }
         self.items.remove(key);
     }
 
