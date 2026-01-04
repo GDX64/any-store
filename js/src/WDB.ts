@@ -27,7 +27,7 @@ function js_next_id(): number {
   return newID;
 }
 
-function js_put_i64(id: number, value: bigint): void {
+function js_put_i32(id: number, value: number): void {
   jsHeap.set(id, value);
 }
 
@@ -70,7 +70,7 @@ export class WDB {
         memory,
       },
       ops: {
-        js_put_i64,
+        js_put_i32,
         js_next_id,
         js_create_string,
         js_push_to_string,
@@ -111,8 +111,8 @@ export class WDB {
     return null;
   }
 
-  static i64(value: bigint): Something {
-    return { tag: "i64", value };
+  static i32(value: number): Something {
+    return { tag: "i32", value };
   }
 
   static string(value: string): Something {
@@ -120,8 +120,8 @@ export class WDB {
   }
 
   static somethinFromValue(value: any): Something | null {
-    if (typeof value === "bigint") {
-      return WDB.i64(value);
+    if (typeof value === "number") {
+      return WDB.i32(value);
     } else if (typeof value === "string") {
       return WDB.string(value);
     }
@@ -152,8 +152,8 @@ class Table<T extends ColMap> {
 
 export type Something =
   | {
-      tag: "i64";
-      value: bigint;
+      tag: "i32";
+      value: number;
     }
   | {
       tag: "string";
@@ -161,8 +161,8 @@ export type Something =
     };
 
 interface ExportsInterface {
-  something_push_i64_to_stack(value: bigint): void;
-  something_pop_i64_from_stack(): bigint;
+  something_push_i32_to_stack(value: number): void;
+  something_pop_i32_from_stack(): number;
   something_pop_from_stack(): number;
   something_push_string(stringID: number): void;
   something_pop_string_from_stack(): number;
@@ -185,19 +185,19 @@ class Ops {
   }
 
   putSomethingOnStack(value: Something) {
-    if (value.tag === "i64") {
-      this.somethingPushI64ToStack(value.value);
+    if (value.tag === "i32") {
+      this.somethingPushi32ToStack(value.value);
     } else if (value.tag === "string") {
       this.pushStringToStack(value.value);
     }
   }
 
-  somethingPushI64ToStack(value: bigint): void {
-    this.exports.something_push_i64_to_stack(value);
+  somethingPushi32ToStack(value: number): void {
+    this.exports.something_push_i32_to_stack(value);
   }
 
-  somethingPopI64FromStack(): bigint {
-    return this.exports.something_pop_i64_from_stack();
+  somethingPopi32FromStack(): number {
+    return this.exports.something_pop_i32_from_stack();
   }
 
   pushStringToStack(str: string): void {

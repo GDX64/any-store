@@ -8,7 +8,7 @@ pub const TABLE_TAG: u8 = 4;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Something {
-    Int(i64),
+    Int(i32),
     String(String),
     Null,
 }
@@ -92,8 +92,8 @@ impl Serializable for Something {
         let tag = buffer.read_bytes(1)[0];
         match tag {
             INT_TAG => {
-                let int_bytes = buffer.read_bytes(8);
-                let int_value = i64::from_le_bytes(int_bytes.try_into().unwrap());
+                let int_bytes = buffer.read_bytes(4);
+                let int_value = i32::from_le_bytes(int_bytes.try_into().unwrap());
                 Something::Int(int_value)
             }
             VALUE_STRING_TAG => {

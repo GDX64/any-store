@@ -115,7 +115,7 @@ fn table_insert_from_stack(table: usize, col: usize) -> Option<()> {
 }
 
 #[unsafe(no_mangle)]
-pub fn something_push_i64_to_stack(value: i64) {
+pub fn something_push_i32_to_stack(value: i32) {
     let something = Something::Int(value);
     GLOBALS.push_to_something_stack(something);
 }
@@ -128,7 +128,7 @@ pub fn something_pop_from_stack() -> i32 {
     match value {
         Something::Int(v) => {
             let id = safe_next_id();
-            safe_put_i64(id, v);
+            safe_put_i32(id, v);
             return id as i32;
         }
         Something::String(s) => {
@@ -196,7 +196,7 @@ unsafe extern "C" {
     unsafe fn js_push_to_string(string_id: usize, byte: u8);
     unsafe fn js_read_string_length(id: usize) -> usize;
     unsafe fn js_next_id() -> usize;
-    unsafe fn js_put_i64(id: usize, value: i64);
+    unsafe fn js_put_i32(id: usize, value: i32);
 }
 
 fn safe_read_string(id: usize, index: usize) -> u8 {
@@ -226,9 +226,9 @@ fn safe_read_string_length(id: usize) -> usize {
     }
 }
 
-fn safe_put_i64(id: usize, value: i64) {
+fn safe_put_i32(id: usize, value: i32) {
     unsafe {
-        js_put_i64(id, value);
+        js_put_i32(id, value);
     }
 }
 

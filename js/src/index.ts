@@ -9,11 +9,11 @@ async function main() {
   const wdb = await WDB.create(data);
   const table = wdb.createTable({
     name: "string",
-    age: "i64",
+    age: "i32",
   });
-  const k1 = WDB.i64(123n);
+  const k1 = WDB.i32(123);
   const v1 = WDB.string("Hello, World!");
-  const v2 = WDB.i64(789n);
+  const v2 = WDB.i32(789);
   table.insert("name", k1, v1);
   table.insert("age", k1, v2);
   const val1 = table.get("name", k1);
