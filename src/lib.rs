@@ -59,22 +59,9 @@ static GLOBALS: LazyLock<GlobalPool> = LazyLock::new(|| GlobalPool::new());
 
 #[unsafe(no_mangle)]
 pub fn start() {
-    log_string("started wasm module");
     std::panic::set_hook(Box::new(|info| {
-        log_string("panic hook called");
-        let msg = if let Some(s) = info.payload().downcast_ref::<&str>() {
-            *s
-        } else if let Some(s) = info.payload().downcast_ref::<String>() {
-            s.as_str()
-        } else {
-            "Unknown panic message"
-        };
-        let location = if let Some(location) = info.location() {
-            format!(" at {}:{}", location.file(), location.line())
-        } else {
-            String::from("")
-        };
-        let full_message = format!("Panic occurred: {}{}", msg, location);
+        let msg = info.to_string();
+        let full_message = format!("Panic occurred: {}", msg);
         log_string(&full_message);
     }));
 }
