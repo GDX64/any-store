@@ -1,25 +1,28 @@
-import "./style.css";
-import typescriptLogo from "./typescript.svg";
-import viteLogo from "/vite.svg";
-import { setupCounter } from "./counter.ts";
+import Worker from "./test.worker?worker";
+import { WDB } from "./WDB";
+import wasmModule from "../../target/wasm32-unknown-unknown/release/any_store.wasm?url";
 
-document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-  <div>
-    <a href="https://vite.dev" target="_blank">
-      <img src="${viteLogo}" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://www.typescriptlang.org/" target="_blank">
-      <img src="${typescriptLogo}" class="logo vanilla" alt="TypeScript logo" />
-    </a>
-    <h1>Vite + TypeScript</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite and TypeScript logos to learn more
-    </p>
-  </div>
-`;
+async function startWorkerTest() {
+  const val = new Worker();
+  val.onmessage = (e) => {
+    console.log("Message from worker:", e.data);
+  };
 
-setupCounter(document.querySelector<HTMLButtonElement>("#counter")!);
+  const response = await fetch(wasmModule);
+  const data = await response.arrayBuffer();
+  const db = await WDB.create(data);
+  const table = db.createTable({
+    age: "i32",
+  });
+  table.insert(WDB.i32(1), WDB.i32(25), "age");
+  const row = table.row(WDB.i32(1));
+  console.log("Main -> Row age:", row.get("age"));
+
+  val.postMessage({
+    module: db.getModule(),
+    memory: db.getMemory(),
+  });
+}
+
+startWorkerTest();
 

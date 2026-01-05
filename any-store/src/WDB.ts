@@ -46,11 +46,23 @@ function safe_js_pop_stack(): void {
   jsStack.pop();
 }
 
+const ops = {
+  js_put_i32,
+  js_put_f64,
+  js_push_to_string,
+  js_read_string_length,
+  js_read_string,
+  js_pop_stack,
+  js_push_string_to_stack,
+  js_log_stack_value,
+};
+
 export class WDB {
   private ops: Ops;
   constructor(
     private wasmInstance: WebAssembly.Instance,
-    private memory: WebAssembly.Memory
+    private memory: WebAssembly.Memory,
+    private module: WebAssembly.Module
   ) {
     this.ops = new Ops(wasmInstance);
   }
@@ -65,20 +77,28 @@ export class WDB {
       env: {
         memory,
       },
-      ops: {
-        js_put_i32,
-        js_put_f64,
-        js_push_to_string,
-        js_read_string_length,
-        js_read_string,
-        js_pop_stack,
-        js_push_string_to_stack,
-        js_log_stack_value,
-      },
+      ops,
     };
     const res = await WebAssembly.instantiate(data, importObj);
-    const { instance } = res;
-    return new WDB(instance, memory);
+    const { instance, module } = res;
+    return new WDB(instance, memory, module);
+  }
+
+  static async fromModule(
+    module: WebAssembly.Module,
+    memory: WebAssembly.Memory
+  ) {
+    const instance = await WebAssembly.instantiate(module, {
+      env: {
+        memory,
+      },
+      ops,
+    });
+    return new WDB(instance, memory, module);
+  }
+
+  getTable<T extends ColMap>(tableID: number, colMap: T): Table<T> {
+    return new Table<T>(colMap, tableID, this);
   }
 
   memSize() {
@@ -111,6 +131,14 @@ export class WDB {
     this.ops.somethingPopFromStack();
     const value = popObjectFromStack();
     return value ?? null;
+  }
+
+  getMemory(): WebAssembly.Memory {
+    return this.memory;
+  }
+
+  getModule(): WebAssembly.Module {
+    return this.module;
   }
 
   static i32(value: number): Something {
