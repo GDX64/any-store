@@ -1,7 +1,4 @@
-use crate::{
-    storage,
-    value::{self, Serializable, Something},
-};
+use crate::{storage, value::Something};
 
 fn setup() -> storage::Table {
     let mut store = storage::Table::new();
@@ -36,15 +33,4 @@ fn test_rows_with() {
     });
 
     assert_eq!(rows.count(), 2);
-}
-
-#[test]
-fn serialization_test() {
-    let store = setup();
-    let row = store.get(&Something::Int(10)).unwrap();
-    let mut buffer = value::ByteBuffer::new();
-    row.serialize(&mut buffer);
-    buffer.reset();
-    let deserialized = storage::Row::deserialize(&mut buffer);
-    assert_eq!(row, &deserialized);
 }

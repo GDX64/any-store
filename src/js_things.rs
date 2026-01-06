@@ -66,9 +66,6 @@ impl GlobalPool {
     }
 }
 
-unsafe impl Send for GlobalPool {}
-unsafe impl Sync for GlobalPool {}
-
 static GLOBALS: LazyLock<GlobalPool> = LazyLock::new(|| GlobalPool::new());
 
 #[unsafe(no_mangle)]
@@ -173,8 +170,7 @@ fn something_push_string() -> Option<()> {
         bytes.push(byte);
     }
     safe_js_pop_stack();
-    let s = String::from_utf8(bytes).unwrap();
-    let something = Something::String(s);
+    let something = Something::String(bytes);
     push_to_something_stack(something);
     return Some(());
 }
@@ -192,7 +188,7 @@ fn add_something_to_js_stack(value: &Something) {
         }
         Something::String(s) => {
             safe_create_string();
-            for byte in s.as_bytes() {
+            for byte in s {
                 safe_push_to_string(*byte);
             }
         }

@@ -42,10 +42,6 @@ function js_read_string(index: number): number {
   return jsStack.at(-1)?.charCodeAt(index) ?? 0;
 }
 
-function safe_js_pop_stack(): void {
-  jsStack.pop();
-}
-
 const ops = {
   js_put_i32,
   js_put_f64,
