@@ -110,6 +110,14 @@ export class WDB {
     return new Table<T>(colMap, id, this);
   }
 
+  insertRowOnTable(tableID: number, key: Something, values: Something[]) {
+    values.forEach((value) => {
+      this.ops.putSomethingOnStack(value);
+    });
+    this.ops.putSomethingOnStack(key);
+    this.ops.exports.table_insert_row(tableID);
+  }
+
   insertOnTable(
     tableID: number,
     col: number,
@@ -188,6 +196,10 @@ class Table<T extends ColMap> {
     this.wdb.insertOnTable(this.id, col!, key, value);
   }
 
+  insertRow(key: Something, values: Something[]) {
+    this.wdb.insertRowOnTable(this.id, key, values);
+  }
+
   get(key: Something, colName: keyof T): Something["value"] | null {
     const col = this.colMap.get(colName as string);
     return this.wdb.getFromTable(this.id, key, col!);
@@ -235,6 +247,7 @@ interface ExportsInterface {
   table_create(): number;
   table_insert_from_stack(tableID: number, col: number): void;
   table_get_something(tableID: number, col: number): void;
+  table_insert_row(tableID: number): void;
   string_take(strIdx: number): number;
   start(): void;
 }

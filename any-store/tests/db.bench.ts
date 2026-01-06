@@ -26,9 +26,7 @@ describe("benchmarks inserts", async () => {
         });
         mockData.forEach((item, index) => {
           const key = WDB.i32(index);
-          table.insert(key, item.name, "name");
-          table.insert(key, item.age, "age");
-          table.insert(key, item.height, "height");
+          table.insertRow(key, [item.name, item.age, item.height]);
         });
       } catch (e) {
         console.error(e);

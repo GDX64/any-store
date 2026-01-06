@@ -137,6 +137,13 @@ impl Table {
         }
     }
 
+    pub fn insert_row(&mut self, mut values: Vec<Something>) -> Option<()> {
+        let key = values.pop()?;
+        let row = Row { values };
+        self.items.insert(key, row);
+        Some(())
+    }
+
     fn update_version(&mut self, version: u64) {
         if version == self.version_counter + 1 {
             self.version_counter = version;
