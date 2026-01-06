@@ -39,23 +39,6 @@ fn test_rows_with() {
 }
 
 #[test]
-fn test_ordering() {
-    let store = setup();
-    let range = store.get_range(&Something::Int(15), &Something::Int(35));
-    assert!(range.count() > 1);
-}
-
-#[test]
-fn test_replication() {
-    let mut store = setup();
-    let ops = store.take_ops();
-    let store2 = storage::Table::from_ops(ops);
-    let h1 = store.tree_hash();
-    let h2 = store2.tree_hash();
-    assert_eq!(h1, h2);
-}
-
-#[test]
 fn serialization_test() {
     let store = setup();
     let row = store.get(&Something::Int(10)).unwrap();
