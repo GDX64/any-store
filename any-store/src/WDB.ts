@@ -97,6 +97,10 @@ export class WDB {
     return new WDB(instance, memory, module);
   }
 
+  commit() {
+    return this.ops.commit();
+  }
+
   getTable<T extends ColMap>(tableID: number, colMap: T): Table<T> {
     return new Table<T>(colMap, tableID, this);
   }
@@ -126,7 +130,7 @@ export class WDB {
   ) {
     this.ops.putSomethingOnStack(key);
     this.ops.putSomethingOnStack(value);
-    this.ops.tableInsertFromStack(tableID, col);
+    this.ops.tableInsert(tableID, col);
   }
 
   getFromTable(
@@ -245,7 +249,8 @@ interface ExportsInterface {
   something_push_null_to_stack(): void;
   something_push_string(): void;
   table_create(): number;
-  table_insert_from_stack(tableID: number, col: number): void;
+  table_insert(tableID: number, col: number): void;
+  commit_ops(): void;
   table_get_something(tableID: number, col: number): void;
   table_insert_row(tableID: number): void;
   string_take(strIdx: number): number;
@@ -259,6 +264,10 @@ class Ops {
 
   get exports(): ExportsInterface {
     return this.instance.exports as unknown as ExportsInterface;
+  }
+
+  commit() {
+    return this.exports.commit_ops();
   }
 
   createTable() {
@@ -302,8 +311,8 @@ class Ops {
     return this.exports.something_pop_from_stack();
   }
 
-  tableInsertFromStack(tableID: number, col: number): void {
-    this.exports.table_insert_from_stack(tableID, col);
+  tableInsert(tableID: number, col: number): void {
+    this.exports.table_insert(tableID, col);
   }
 
   tableGetSomething(tableID: number, col: number): void {

@@ -4,12 +4,26 @@ use std::{
 };
 
 use crate::{
-    storage::{self, Database, Table},
+    storage::{Database, Table},
     value::Something,
 };
 
+enum Operation {
+    InsertRow {
+        table_id: usize,
+        data: Vec<Something>,
+    },
+    Insert {
+        table_id: usize,
+        key: Something,
+        value: Something,
+        index: usize,
+    },
+}
+
 thread_local! {
     static SOMETHING_STACK: RefCell<Vec<Something>> = RefCell::new(Vec::new());
+    static OPERATION_STACK: RefCell<Vec<Operation>> = RefCell::new(Vec::new());
 }
 
 fn push_to_something_stack(value: Something) {
@@ -40,10 +54,9 @@ impl GlobalPool {
         return db.create_table();
     }
 
-    fn with_table_mut<R, F: FnOnce(&mut Table) -> R>(&self, idx: usize, f: F) -> Option<R> {
+    fn with_db_mut<R, F: FnOnce(&mut Database) -> R>(&self, f: F) -> Option<R> {
         let mut pool = self.db.write().ok()?;
-        let value = pool.get_table_mut(idx)?;
-        return Some(f(value));
+        return Some(f(&mut pool));
     }
 
     fn with_table<R, F: FnOnce(&Table) -> R>(&self, idx: usize, f: F) -> Option<R> {
@@ -85,20 +98,56 @@ pub fn table_get_something(table: usize, col: usize) -> Option<()> {
 }
 
 #[unsafe(no_mangle)]
-fn table_insert_from_stack(table: usize, col: usize) -> Option<()> {
+fn table_insert(table: usize, col: usize) -> Option<()> {
     let value = pop_from_something_stack()?;
     let key = pop_from_something_stack()?;
-    return GLOBALS.with_table_mut(table, |table: &mut storage::Table| {
-        table.insert_at(key, value, col);
+    OPERATION_STACK.with_borrow_mut(|stack| {
+        stack.push(Operation::Insert {
+            table_id: table,
+            key,
+            value,
+            index: col,
+        });
+    });
+    return Some(());
+}
+
+#[unsafe(no_mangle)]
+fn commit_ops() {
+    GLOBALS.with_db_mut(|db| {
+        let ops = OPERATION_STACK.take();
+        for op in ops {
+            match op {
+                Operation::InsertRow { table_id, data } => {
+                    db.get_table_mut(table_id).and_then(|table| {
+                        return table.insert_row(data);
+                    });
+                }
+                Operation::Insert {
+                    table_id,
+                    key,
+                    value,
+                    index,
+                } => {
+                    db.get_table_mut(table_id).map(|table| {
+                        return table.insert_at(key, value, index);
+                    });
+                }
+            }
+        }
     });
 }
 
 #[unsafe(no_mangle)]
 fn table_insert_row(table: usize) -> Option<()> {
     let v = SOMETHING_STACK.take();
-    return GLOBALS.with_table_mut(table, |table: &mut storage::Table| {
-        table.insert_row(v);
+    OPERATION_STACK.with_borrow_mut(|stack| {
+        stack.push(Operation::InsertRow {
+            table_id: table,
+            data: v,
+        });
     });
+    return Some(());
 }
 
 #[unsafe(no_mangle)]

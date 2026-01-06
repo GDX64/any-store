@@ -17,6 +17,7 @@ describe("Database Module", () => {
     table.insert(k1, WDB.i32(30), "age");
     table.insert(k1, WDB.f64(1.75), "height");
     table.insert(WDB.i32(0), WDB.string("Bob"), "name");
+    wdb.commit();
 
     const row1 = table.row(k1);
     expect(row1.get("name")).toBe("Alice");
@@ -52,6 +53,7 @@ describe("Database Module", () => {
         table.insert(key, WDB.i32(item.age), "age");
         table.insert(key, WDB.f64(item.height), "height");
       });
+      wdb.commit();
     }
   });
 });
