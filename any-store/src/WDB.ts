@@ -254,12 +254,10 @@ interface ExportsInterface {
 }
 
 class Ops {
-  constructor(private instance: WebAssembly.Instance) {
+  exports: ExportsInterface;
+  constructor(instance: WebAssembly.Instance) {
+    this.exports = instance.exports as unknown as ExportsInterface;
     this.exports.start();
-  }
-
-  get exports(): ExportsInterface {
-    return this.instance.exports as unknown as ExportsInterface;
   }
 
   commit() {
