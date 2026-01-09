@@ -21,6 +21,10 @@ impl Row {
     pub fn get(&self, index: usize) -> &Something {
         return self.values.get(index).unwrap_or(&Something::Null);
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Something> {
+        return self.values.iter();
+    }
 }
 
 pub struct Database {

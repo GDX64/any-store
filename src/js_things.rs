@@ -90,7 +90,19 @@ pub fn table_get_something(table: usize, col: usize) -> Option<()> {
             return Some(row.get(col).clone());
         });
     })??;
-    push_to_something_stack(something);
+    add_something_to_js_stack(&something);
+    return Some(());
+}
+
+#[unsafe(no_mangle)]
+pub fn table_get_row(table: usize) -> Option<()> {
+    let key = pop_from_something_stack()?;
+    let row = GLOBALS.with_table(table, |table: &Table| {
+        return table.get(&key).cloned();
+    })??;
+    for item in row.iter() {
+        add_something_to_js_stack(&item);
+    }
     return Some(());
 }
 
@@ -154,14 +166,6 @@ pub fn something_push_i32_to_stack(value: i32) {
 }
 
 #[unsafe(no_mangle)]
-pub fn something_pop_from_stack() {
-    let Some(value) = pop_from_something_stack() else {
-        return;
-    };
-    add_something_to_js_stack(&value);
-}
-
-#[unsafe(no_mangle)]
 fn something_push_string() -> Option<()> {
     let len = safe_read_string_length();
     let mut bytes = Vec::with_capacity(len);
@@ -193,7 +197,7 @@ fn add_something_to_js_stack(value: &Something) {
             }
         }
         Something::Null => {
-            return;
+            safe_push_null();
         }
         Something::Float(f) => {
             safe_put_f64(*f);
@@ -213,6 +217,7 @@ unsafe extern "C" {
     unsafe fn js_put_i32(value: i32);
     unsafe fn js_put_f64(value: f64);
     unsafe fn js_log_stack_value();
+    unsafe fn js_push_null();
 }
 
 fn safe_read_string(index: usize) -> u8 {
@@ -256,6 +261,12 @@ fn safe_put_f64(value: f64) {
 fn safe_js_pop_stack() {
     unsafe {
         js_pop_stack();
+    }
+}
+
+fn safe_push_null() {
+    unsafe {
+        js_push_null();
     }
 }
 

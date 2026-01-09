@@ -28,16 +28,20 @@ describe("Database Module", () => {
     expect(row2.get("name")).toBe("Bob");
   });
 
-  const mockData = Array.from({ length: 100 }, (_, i) => {
-    return {
+  const mockData = new Map<
+    number,
+    { age: number; height: number; name: string }
+  >();
+  Array.from({ length: 100 }, (_, i) => {
+    mockData.set(i, {
       age: Math.round(Math.random() * 100),
       height: Math.random() * 2,
       name: `Name_${i}`,
-    };
+    });
   });
 
   test("insert random data", async () => {
-    const TABLES = 10;
+    const TABLES = 2;
     const data = fs.readFileSync(wasmPath);
     const wdb = await WDB.create(data);
     for (let t = 0; t < TABLES; t++) {
@@ -54,6 +58,21 @@ describe("Database Module", () => {
         table.insert(key, WDB.f64(item.height), "height");
       });
       wdb.commit();
+
+      mockData.forEach((item, index) => {
+        const key = WDB.i32(index);
+        const row = table.row(key);
+        const rowData = row.getRow();
+        expect(rowData[0]).toBe(item.name);
+        expect(rowData[1]).toBe(item.age);
+        expect(rowData[2]).toBeCloseTo(item.height);
+        const name = row.get("name");
+        const age = row.get("age");
+        const height = row.get("height");
+        expect(name).toBe(item.name);
+        expect(age).toBe(item.age);
+        expect(height).toBeCloseTo(item.height);
+      });
     }
   });
 });

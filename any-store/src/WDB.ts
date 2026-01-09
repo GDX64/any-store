@@ -4,9 +4,17 @@ function pushToStringStack(str: string) {
   jsStack.push(str);
 }
 
+function getWholeStack(): any[] {
+  return jsStack.splice(0, jsStack.length);
+}
+
 function popObjectFromStack(): any {
   const val = jsStack.pop();
   return val;
+}
+
+function js_push_null(): void {
+  jsStack.push(null);
 }
 
 function js_put_i32(value: number): void {
@@ -51,6 +59,7 @@ const ops = {
   js_pop_stack,
   js_push_string_to_stack,
   js_log_stack_value,
+  js_push_null,
 };
 
 export class WDB {
@@ -136,9 +145,14 @@ export class WDB {
   ): Something["value"] | null {
     this.ops.putSomethingOnStack(key);
     this.ops.tableGetSomething(tableID, col);
-    this.ops.somethingPopFromStack();
     const value = popObjectFromStack();
     return value ?? null;
+  }
+
+  getRowFromTable(tableID: number, key: Something): Something["value"][] {
+    this.ops.putSomethingOnStack(key);
+    this.ops.getRowFromTable(tableID);
+    return getWholeStack();
   }
 
   getMemory(): WebAssembly.Memory {
@@ -191,6 +205,10 @@ class Table<T extends ColMap> {
     });
   }
 
+  getRow(key: Something): Something["value"][] {
+    return this.wdb.getRowFromTable(this.id, key);
+  }
+
   insert(key: Something, value: Something, colName: keyof T) {
     const col = this.colMap.get(colName as string);
     this.wdb.insertOnTable(this.id, col!, key, value);
@@ -215,6 +233,10 @@ class Row<T extends ColMap> {
 
   get<K extends keyof T>(colName: K): Something["value"] | null {
     return this.table.get(this.key, colName);
+  }
+
+  getRow(): Something["value"][] {
+    return this.table.getRow(this.key);
   }
 }
 
@@ -246,6 +268,7 @@ interface ExportsInterface {
   something_push_string(): void;
   table_create(): number;
   table_insert(tableID: number, col: number): void;
+  table_get_row(tableID: number): void;
   commit_ops(): void;
   table_get_something(tableID: number, col: number): void;
   table_insert_row(tableID: number): void;
@@ -278,6 +301,10 @@ class Ops {
     } else if (value.tag === "null") {
       this.pushNullToStack();
     }
+  }
+
+  getRowFromTable(tableID: number): void {
+    this.exports.table_get_row(tableID);
   }
 
   pushNullToStack(): void {

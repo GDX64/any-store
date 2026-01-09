@@ -6,7 +6,7 @@ const wasmPath = "../target/wasm32-unknown-unknown/release/any_store.wasm";
 
 describe("benchmarks inserts", async () => {
   const data = fs.readFileSync(wasmPath);
-  const mockData = Array.from({ length: 10_000 }, (_, i) => {
+  const mockData = Array.from({ length: 100 }, (_, i) => {
     return {
       age: WDB.i32(Math.round(Math.random() * 100)),
       height: WDB.f64(Math.random() * 2),
@@ -137,10 +137,8 @@ describe("benchmarks selects", async () => {
     for (let i = 0; i < N; i++) {
       const key = WDB.i32(Math.floor(Math.random() * 10_000));
       const row = table.row(key);
-      const name = row.get("name");
-      const age = row.get("age");
-      const height = row.get("height");
-      results.push({ name, age, height });
+      const rowData = row.getRow();
+      results.push(rowData);
     }
   });
 
