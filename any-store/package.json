@@ -8,10 +8,12 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "bench": "vitest bench"
+    "bench": "vitest bench",
+    "test:browser": "vitest --config=vitest.browser.config.ts"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",
+    "@vitest/browser-playwright": "^4.0.18",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "vite": "npm:rolldown-vite@7.2.5",
@@ -21,4 +23,3 @@
     "vite": "npm:rolldown-vite@7.2.5"
   }
 }
-

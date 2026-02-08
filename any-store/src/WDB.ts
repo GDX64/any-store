@@ -67,7 +67,7 @@ export class WDB {
   constructor(
     private wasmInstance: WebAssembly.Instance,
     private memory: WebAssembly.Memory,
-    private module: WebAssembly.Module
+    private module: WebAssembly.Module,
   ) {
     this.ops = new Ops(wasmInstance);
   }
@@ -91,7 +91,7 @@ export class WDB {
 
   static async fromModule(
     module: WebAssembly.Module,
-    memory: WebAssembly.Memory
+    memory: WebAssembly.Memory,
   ) {
     const instance = await WebAssembly.instantiate(module, {
       env: {
@@ -131,7 +131,7 @@ export class WDB {
     tableID: number,
     col: number,
     key: Something,
-    value: Something
+    value: Something,
   ) {
     this.ops.putSomethingOnStack(key);
     this.ops.putSomethingOnStack(value);
@@ -141,7 +141,7 @@ export class WDB {
   getFromTable(
     tableID: number,
     key: Something,
-    col: number
+    col: number,
   ): Something["value"] | null {
     this.ops.putSomethingOnStack(key);
     this.ops.tableGetSomething(tableID, col);
@@ -197,9 +197,13 @@ export class WDB {
 
 type ColMap = Record<string, Something["tag"]>;
 
-class Table<T extends ColMap> {
+export class Table<T extends ColMap> {
   colMap: Map<string, number> = new Map();
-  constructor(colMap: T, private id: number, private wdb: WDB) {
+  constructor(
+    colMap: T,
+    private id: number,
+    private wdb: WDB,
+  ) {
     Object.keys(colMap).forEach((colName, index) => {
       this.colMap.set(colName, index);
     });
@@ -228,11 +232,18 @@ class Table<T extends ColMap> {
   }
 }
 
-class Row<T extends ColMap> {
-  constructor(private table: Table<T>, private key: Something) {}
+export class Row<T extends ColMap> {
+  constructor(
+    private table: Table<T>,
+    private key: Something,
+  ) {}
 
   get<K extends keyof T>(colName: K): Something["value"] | null {
     return this.table.get(this.key, colName);
+  }
+
+  update<K extends keyof T>(colName: K, value: Something) {
+    this.table.insert(this.key, value, colName);
   }
 
   getRow(): Something["value"][] {
