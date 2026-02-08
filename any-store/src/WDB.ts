@@ -50,6 +50,10 @@ function js_read_string(index: number): number {
   return jsStack.at(-1)?.charCodeAt(index) ?? 0;
 }
 
+function js_performance_now() {
+  return performance.now();
+}
+
 const ops = {
   js_put_i32,
   js_put_f64,
@@ -60,6 +64,7 @@ const ops = {
   js_push_string_to_stack,
   js_log_stack_value,
   js_push_null,
+  js_performance_now,
 };
 
 export class WDB {

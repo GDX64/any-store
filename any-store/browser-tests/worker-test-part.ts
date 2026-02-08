@@ -11,9 +11,8 @@ self.onmessage = async (event) => {
     data: "worker is ready",
   });
 
-  for (let i = 0; i < 1000; i++) {
+  for (let i = 0; i < 10_000; i++) {
     const current = row.get("counter") as number;
-    console.log("Worker -> Current counter:", current);
     row.update("counter", WDB.i32(current + 1));
     db.commit();
   }
