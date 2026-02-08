@@ -1,9 +1,7 @@
-use std::{
-    cell::RefCell,
-    sync::{LazyLock, RwLock},
-};
+use std::{mem, sync::LazyLock};
 
 use crate::{
+    my_rwlock::MyRwLock,
     storage::{Database, Table},
     value::Something,
 };
@@ -21,36 +19,36 @@ enum Operation {
     },
 }
 
-thread_local! {
-    static SOMETHING_STACK: RefCell<Vec<Something>> = RefCell::new(Vec::new());
-    static OPERATION_STACK: RefCell<Vec<Operation>> = RefCell::new(Vec::new());
-}
+static SOMETHING_STACK: LazyLock<MyRwLock<[Vec<Something>; 16]>> =
+    LazyLock::new(|| MyRwLock::new(Default::default()));
+static OPERATION_STACK: LazyLock<MyRwLock<[Vec<Operation>; 16]>> =
+    LazyLock::new(|| MyRwLock::new(Default::default()));
 
 fn push_to_something_stack(value: Something) {
-    SOMETHING_STACK.with(|stack| {
-        stack.borrow_mut().push(value);
-    });
+    let mut stack = SOMETHING_STACK.write();
+    let worker_id = worker_id();
+    stack[worker_id].push(value);
 }
 
 fn pop_from_something_stack() -> Option<Something> {
-    SOMETHING_STACK.with(|stack| {
-        return stack.borrow_mut().pop();
-    })
+    let mut stack = SOMETHING_STACK.write();
+    let worker_id = worker_id();
+    return stack[worker_id].pop();
 }
 
 struct GlobalPool {
-    db: RwLock<Database>,
+    db: MyRwLock<Database>,
 }
 
 impl GlobalPool {
     fn new() -> Self {
         GlobalPool {
-            db: RwLock::new(Database::new()),
+            db: MyRwLock::new(Database::new()),
         }
     }
 
     fn add_table(&self) -> usize {
-        let mut db = self.db.write().unwrap();
+        let mut db = self.db.write();
         return db.create_table();
     }
 
@@ -60,12 +58,12 @@ impl GlobalPool {
     // }
 
     fn with_db<R, F: FnOnce(&Database) -> R>(&self, f: F) -> Option<R> {
-        let pool = self.db.read().ok()?;
+        let pool = self.db.read();
         return Some(f(&pool));
     }
 
     fn with_table<R, F: FnOnce(&Table) -> R>(&self, idx: usize, f: F) -> Option<R> {
-        let pool = self.db.read().ok()?;
+        let pool = self.db.read();
         let value = pool.get_table(idx)?;
         return Some(f(&value));
     }
@@ -75,6 +73,7 @@ static GLOBALS: LazyLock<GlobalPool> = LazyLock::new(|| GlobalPool::new());
 
 #[unsafe(no_mangle)]
 pub fn start() {
+    log_string(&format!("mod start with worker_id {}", worker_id()));
     std::panic::set_hook(Box::new(|info| {
         let msg = info.to_string();
         let full_message = format!("Panic occurred: {}", msg);
@@ -115,13 +114,12 @@ pub fn table_get_row(table: usize) -> Option<()> {
 fn table_insert(table: usize, col: usize) -> Option<()> {
     let value = pop_from_something_stack()?;
     let key = pop_from_something_stack()?;
-    OPERATION_STACK.with_borrow_mut(|stack| {
-        stack.push(Operation::Insert {
-            table_id: table,
-            key,
-            value,
-            index: col,
-        });
+    let mut stack = OPERATION_STACK.write();
+    stack[worker_id()].push(Operation::Insert {
+        table_id: table,
+        key,
+        value,
+        index: col,
     });
     return Some(());
 }
@@ -129,7 +127,8 @@ fn table_insert(table: usize, col: usize) -> Option<()> {
 #[unsafe(no_mangle)]
 fn commit_ops() {
     GLOBALS.with_db(|db| {
-        let ops = OPERATION_STACK.take();
+        let mut val = OPERATION_STACK.write();
+        let ops = std::mem::take(&mut val[worker_id()]);
         for op in ops {
             match op {
                 Operation::InsertRow { table_id, data } => {
@@ -154,12 +153,14 @@ fn commit_ops() {
 
 #[unsafe(no_mangle)]
 fn table_insert_row(table: usize) -> Option<()> {
-    let v = SOMETHING_STACK.take();
-    OPERATION_STACK.with_borrow_mut(|stack| {
-        stack.push(Operation::InsertRow {
-            table_id: table,
-            data: v,
-        });
+    let v = {
+        let mut val = SOMETHING_STACK.write();
+        mem::take(&mut val[worker_id()])
+    };
+    let mut stack = OPERATION_STACK.write();
+    stack[worker_id()].push(Operation::InsertRow {
+        table_id: table,
+        data: v,
     });
     return Some(());
 }
@@ -223,6 +224,18 @@ unsafe extern "C" {
     unsafe fn js_put_f64(value: f64);
     unsafe fn js_log_stack_value();
     unsafe fn js_push_null();
+}
+
+#[link(wasm_import_module = "env")]
+unsafe extern "C" {
+    #[link_name = "worker_id"]
+    fn unsafe_worker_id() -> i32;
+}
+
+fn worker_id() -> usize {
+    unsafe {
+        return unsafe_worker_id() as usize;
+    }
 }
 
 fn safe_read_string(index: usize) -> u8 {

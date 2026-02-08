@@ -72,15 +72,17 @@ export class WDB {
     this.ops = new Ops(wasmInstance);
   }
 
-  static async create(data: BufferSource) {
+  static async create(data: BufferSource, id: number) {
     const memory = new WebAssembly.Memory({
       initial: 20,
       maximum: 10_000,
       shared: true,
     });
+    const worker_id = () => id;
     const importObj = {
       env: {
         memory,
+        worker_id,
       },
       ops,
     };
@@ -92,10 +94,13 @@ export class WDB {
   static async fromModule(
     module: WebAssembly.Module,
     memory: WebAssembly.Memory,
+    id: number,
   ) {
+    const worker_id = () => id;
     const instance = await WebAssembly.instantiate(module, {
       env: {
         memory,
+        worker_id,
       },
       ops,
     });

@@ -4,7 +4,7 @@ self.onmessage = async (event) => {
   console.log("Message from main thread:", event.data);
   const module = event.data.module;
   const memory = event.data.memory;
-  const db = await WDB.fromModule(module, memory);
+  const db = await WDB.fromModule(module, memory, 1);
   const table = db.getTable(1, { counter: "i32" });
   const row = table.row(WDB.i32(1));
   self.postMessage({
