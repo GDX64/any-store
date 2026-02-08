@@ -54,15 +54,20 @@ impl GlobalPool {
         return db.create_table();
     }
 
-    fn with_db_mut<R, F: FnOnce(&mut Database) -> R>(&self, f: F) -> Option<R> {
-        let mut pool = self.db.write().ok()?;
-        return Some(f(&mut pool));
+    // fn with_db_mut<R, F: FnOnce(&mut Database) -> R>(&self, f: F) -> Option<R> {
+    //     let mut pool = self.db.write().ok()?;
+    //     return Some(f(&mut pool));
+    // }
+
+    fn with_db<R, F: FnOnce(&Database) -> R>(&self, f: F) -> Option<R> {
+        let pool = self.db.read().ok()?;
+        return Some(f(&pool));
     }
 
     fn with_table<R, F: FnOnce(&Table) -> R>(&self, idx: usize, f: F) -> Option<R> {
         let pool = self.db.read().ok()?;
         let value = pool.get_table(idx)?;
-        return Some(f(value));
+        return Some(f(&value));
     }
 }
 
@@ -123,12 +128,12 @@ fn table_insert(table: usize, col: usize) -> Option<()> {
 
 #[unsafe(no_mangle)]
 fn commit_ops() {
-    GLOBALS.with_db_mut(|db| {
+    GLOBALS.with_db(|db| {
         let ops = OPERATION_STACK.take();
         for op in ops {
             match op {
                 Operation::InsertRow { table_id, data } => {
-                    db.get_table_mut(table_id).and_then(|table| {
+                    db.get_table_mut(table_id).and_then(|mut table| {
                         return table.insert_row(data);
                     });
                 }
@@ -138,7 +143,7 @@ fn commit_ops() {
                     value,
                     index,
                 } => {
-                    db.get_table_mut(table_id).map(|table| {
+                    db.get_table_mut(table_id).map(|mut table| {
                         return table.insert_at(key, value, index);
                     });
                 }
