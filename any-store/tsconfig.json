@@ -20,7 +20,10 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
-    "noEmit": true,
+    "noEmit": false,
+    "composite": true,
+    "outDir": "./dist-ts",
+    "emitDeclarationOnly": true,
 
     /* Linting */
     "strict": true,

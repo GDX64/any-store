@@ -72,7 +72,7 @@ const ops = {
 export class WDB {
   private ops: Ops;
   constructor(
-    private wasmInstance: WebAssembly.Instance,
+    wasmInstance: WebAssembly.Instance,
     private memory: WebAssembly.Memory,
     private module: WebAssembly.Module,
   ) {
