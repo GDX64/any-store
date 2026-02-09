@@ -3,10 +3,11 @@ import { WDB } from "../src/WDB";
 import { describe, expect, test } from "vitest";
 const wasmPath = "../target/wasm32-unknown-unknown/release/any_store.wasm";
 
+const data = fs.readFileSync(wasmPath);
+
 describe("Database Module", () => {
   test("should initialize the database correctly", async () => {
-    const data = fs.readFileSync(wasmPath);
-    const wdb = await WDB.create(data);
+    const wdb = await WDB.create(0, data);
     const table = wdb.createTable({
       name: "string",
       age: "i32",
@@ -43,7 +44,7 @@ describe("Database Module", () => {
   test("insert random data", async () => {
     const TABLES = 2;
     const data = fs.readFileSync(wasmPath);
-    const wdb = await WDB.create(data);
+    const wdb = await WDB.create(0, data);
     for (let t = 0; t < TABLES; t++) {
       const table = wdb.createTable({
         name: "string",

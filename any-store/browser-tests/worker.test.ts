@@ -1,7 +1,6 @@
 import { describe, test } from "vitest";
 import Worker from "./worker-test-part?worker";
 import { WDB } from "../src/WDB";
-import wasmModule from "../../target/wasm32-unknown-unknown/release/any_store.wasm?url";
 
 describe("Web Worker", async () => {
   test("counter", async () => {
@@ -13,9 +12,7 @@ describe("Web Worker", async () => {
       });
     }
 
-    const response = await fetch(wasmModule);
-    const data = await response.arrayBuffer();
-    const db = await WDB.create(data, 0);
+    const db = await WDB.create(0);
     const table = db.createTable({
       counter: "i32",
     });

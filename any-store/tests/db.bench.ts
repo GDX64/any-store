@@ -4,8 +4,8 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "fs";
 const wasmPath = "../target/wasm32-unknown-unknown/release/any_store.wasm";
 
+const data = fs.readFileSync(wasmPath);
 describe("benchmarks inserts", async () => {
-  const data = fs.readFileSync(wasmPath);
   const mockData = Array.from({ length: 100 }, (_, i) => {
     return {
       age: WDB.i32(Math.round(Math.random() * 100)),
@@ -13,7 +13,7 @@ describe("benchmarks inserts", async () => {
       name: WDB.string("PETR4" + i),
     };
   });
-  const db = await WDB.create(data);
+  const db = await WDB.create(0, data);
 
   bench(
     "insert on db",
@@ -35,7 +35,7 @@ describe("benchmarks inserts", async () => {
     },
     {
       time: 100,
-    }
+    },
   );
 
   bench(
@@ -49,13 +49,13 @@ describe("benchmarks inserts", async () => {
             name: item.name.value,
             age: item.age.value,
             height: item.height.value,
-          })
+          }),
         );
       });
     },
     {
       time: 100,
-    }
+    },
   );
 
   const sqliteDB = new DatabaseSync(":memory:");
@@ -67,12 +67,12 @@ describe("benchmarks inserts", async () => {
       const tableName = `test_${count}`;
       sqliteDB.exec(`pragma journal_mode = WAL;`);
       sqliteDB.exec(
-        `CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY, name TEXT, age INTEGER, height REAL);`
+        `CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY, name TEXT, age INTEGER, height REAL);`,
       );
       // Wrap all inserts in a single transaction
       sqliteDB.exec("BEGIN TRANSACTION");
       const stmt = sqliteDB.prepare(
-        `INSERT INTO ${tableName} (id, name, age, height) VALUES (?, ?, ?, ?);`
+        `INSERT INTO ${tableName} (id, name, age, height) VALUES (?, ?, ?, ?);`,
       );
       mockData.forEach((item, index) => {
         stmt.run(index, item.name.value, item.age.value, item.height.value);
@@ -81,12 +81,11 @@ describe("benchmarks inserts", async () => {
     },
     {
       time: 100,
-    }
+    },
   );
 });
 
 describe("benchmarks selects", async () => {
-  const data = fs.readFileSync(wasmPath);
   const mockData = Array.from({ length: 10_000 }, (_, i) => {
     return {
       age: WDB.i32(Math.round(Math.random() * 100)),
@@ -94,7 +93,7 @@ describe("benchmarks selects", async () => {
       name: WDB.string("PETR4" + i),
     };
   });
-  const db = await WDB.create(data);
+  const db = await WDB.create(0, data);
   const table = db.createTable({
     name: "string",
     age: "i32",
@@ -111,11 +110,11 @@ describe("benchmarks selects", async () => {
   const sqliteDB = new DatabaseSync(":memory:");
   sqliteDB.exec(`pragma journal_mode = WAL;`);
   sqliteDB.exec(
-    `CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT, age INTEGER, height REAL);`
+    `CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT, age INTEGER, height REAL);`,
   );
   sqliteDB.exec("BEGIN TRANSACTION");
   const stmt = sqliteDB.prepare(
-    `INSERT INTO test (id, name, age, height) VALUES (?, ?, ?, ?);`
+    `INSERT INTO test (id, name, age, height) VALUES (?, ?, ?, ?);`,
   );
   mockData.forEach((item, index) => {
     stmt.run(index, item.name.value, item.age.value, item.height.value);
@@ -156,7 +155,7 @@ describe("benchmarks selects", async () => {
     const N = 1000;
     const results: any = [];
     const stmt = sqliteDB.prepare(
-      `SELECT name, age, height FROM test WHERE id = ?;`
+      `SELECT name, age, height FROM test WHERE id = ?;`,
     );
     for (let i = 0; i < N; i++) {
       const key = Math.floor(Math.random() * 10_000);

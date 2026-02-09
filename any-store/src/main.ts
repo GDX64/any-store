@@ -1,6 +1,5 @@
 import Worker from "./test.worker?worker";
 import { WDB } from "./WDB";
-import wasmModule from "../../target/wasm32-unknown-unknown/release/any_store.wasm?url";
 
 async function startWorkerTest() {
   const val = new Worker();
@@ -8,9 +7,7 @@ async function startWorkerTest() {
     console.log("Message from worker:", e.data);
   };
 
-  const response = await fetch(wasmModule);
-  const data = await response.arrayBuffer();
-  const db = await WDB.create(data);
+  const db = await WDB.create(0);
   const table = db.createTable({
     weight: "f64",
     age: "i32",

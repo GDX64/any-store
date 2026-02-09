@@ -1,3 +1,5 @@
+import wasmModule from "../../target/wasm32-unknown-unknown/release/any_store.wasm?url";
+
 const jsStack: any[] = [];
 
 function pushToStringStack(str: string) {
@@ -77,7 +79,14 @@ export class WDB {
     this.ops = new Ops(wasmInstance);
   }
 
-  static async create(data: BufferSource, id: number) {
+  static async create(id: number = 0, bufferSource?: BufferSource) {
+    let data: BufferSource;
+    if (bufferSource) {
+      data = bufferSource;
+    } else {
+      const response = await fetch(wasmModule);
+      data = await response.arrayBuffer();
+    }
     const memory = new WebAssembly.Memory({
       initial: 20,
       maximum: 10_000,
