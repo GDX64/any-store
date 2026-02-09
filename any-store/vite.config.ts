@@ -8,7 +8,7 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, "src/lib.ts"),
       name: "AnyStore",
-      fileName: (format) => `any-store.${format}.js`,
+      fileName: (format) => `lib.${format}.js`,
       formats: ["es"],
     },
     rollupOptions: {

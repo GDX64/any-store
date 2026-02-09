@@ -1,7 +1,7 @@
 {
-  "name": "any-store",
-  "private": true,
-  "version": "0.0.1",
+  "name": "@glmachado/any-store",
+  "private": false,
+  "version": "0.1.0",
   "type": "module",
   "files": [
     "dist"
@@ -9,7 +9,7 @@
   "module": "./dist/lib.js",
   "exports": {
     ".": {
-      "import": "./dist/any-store.es",
+      "import": "./dist/any-store.es.js",
       "types": "./dist/src/lib.d.ts"
     }
   },
