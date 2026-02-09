@@ -1,9 +1,5 @@
-use crate::{my_rwlock::MyRwLock, value::Something};
-use std::{
-    collections::HashMap,
-    hash::Hash,
-    sync::{RwLockReadGuard, RwLockWriteGuard},
-};
+use crate::value::Something;
+use std::{collections::HashMap, hash::Hash};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Row {
@@ -33,7 +29,7 @@ impl Row {
 
 pub struct Database {
     last_table_id: usize,
-    tables: HashMap<usize, MyRwLock<Table>>,
+    tables: HashMap<usize, Table>,
 }
 
 impl Database {
@@ -47,19 +43,18 @@ impl Database {
     pub fn create_table(&mut self) -> usize {
         self.last_table_id += 1;
         let table_id = self.last_table_id;
-        self.tables.insert(table_id, MyRwLock::new(Table::new()));
+        self.tables.insert(table_id, Table::new());
         return table_id;
     }
 
-    pub fn get_table_mut<'a>(&'a self, table_id: usize) -> Option<RwLockWriteGuard<'a, Table>> {
-        let thing = self.tables.get(&table_id)?;
-        let thing_mut = thing.write();
-        return Some(thing_mut);
+    pub fn get_table_mut(&mut self, table_id: usize) -> Option<&mut Table> {
+        let thing = self.tables.get_mut(&table_id)?;
+        return Some(thing);
     }
 
-    pub fn get_table<'a>(&'a self, table_id: usize) -> Option<RwLockReadGuard<'a, Table>> {
-        let tab = self.tables.get(&table_id)?.read();
-        return Some(tab);
+    pub fn get_table<'a>(&'a self, table_id: usize) -> Option<&Table> {
+        let thing = self.tables.get(&table_id)?;
+        return Some(thing);
     }
 }
 
