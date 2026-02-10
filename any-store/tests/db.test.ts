@@ -12,11 +12,13 @@ describe("Database Module", () => {
       name: "string",
       age: "i32",
       height: "f64",
+      data: "blob",
     });
     const k1 = WDB.i32(123);
     table.insert(k1, WDB.string("Alice"), "name");
     table.insert(k1, WDB.i32(30), "age");
     table.insert(k1, WDB.f64(1.75), "height");
+    table.insert(k1, WDB.blob(new Uint8Array([1, 2, 3]))!, "data");
     table.insert(WDB.i32(0), WDB.string("Bob"), "name");
     wdb.commit();
 
@@ -24,6 +26,7 @@ describe("Database Module", () => {
     expect(row1.get("name")).toBe("Alice");
     expect(row1.get("age")).toBe(30);
     expect(row1.get("height")).toBeCloseTo(1.75);
+    expect(row1.get("data")).toEqual(new Uint8Array([1, 2, 3]));
 
     const row2 = table.row(WDB.i32(0));
     expect(row2.get("name")).toBe("Bob");

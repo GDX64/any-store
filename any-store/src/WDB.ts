@@ -6,12 +6,19 @@ function pushToStringStack(str: string) {
   jsStack.push(str);
 }
 
+function pushBlobToStack(blob: Uint8Array) {
+  jsStack.push(blob);
+}
+
 function getWholeStack(): any[] {
   return jsStack.splice(0, jsStack.length);
 }
 
 function popObjectFromStack(): any {
   const val = jsStack.pop();
+  if (typeof val === "object") {
+    return val.value;
+  }
   return val;
 }
 
@@ -52,8 +59,26 @@ function js_read_string(index: number): number {
   return jsStack.at(-1)?.charCodeAt(index) ?? 0;
 }
 
+function js_read_blob_length(): number {
+  return jsStack.at(-1)?.length ?? 0;
+}
+
+function js_read_blob_byte(index: number): number {
+  return jsStack.at(-1)?.[index] ?? 0;
+}
+
 function js_performance_now() {
   return performance.now();
+}
+
+function js_create_blob(size: number) {
+  jsStack.push({ value: new Uint8Array(size), index: 0 });
+}
+
+function js_push_to_blob(byte: number) {
+  const blob = jsStack.at(-1) as { value: Uint8Array; index: number };
+  blob.value[blob.index] = byte;
+  blob.index += 1;
 }
 
 const ops = {
@@ -67,6 +92,10 @@ const ops = {
   js_log_stack_value,
   js_push_null,
   js_performance_now,
+  js_create_blob,
+  js_push_to_blob,
+  js_read_blob_length,
+  js_read_blob_byte,
 };
 
 export class WDB {
@@ -190,6 +219,10 @@ export class WDB {
     return { tag: "f64", value };
   }
 
+  static blob(value: Uint8Array): Something {
+    return { tag: "blob", value };
+  }
+
   static string(value: string): Something {
     return { tag: "string", value };
   }
@@ -209,6 +242,8 @@ export class WDB {
       return WDB.string(value);
     } else if (value === null) {
       return { tag: "null", value: null };
+    } else if (value instanceof Uint8Array) {
+      return WDB.blob(value);
     }
     return null;
   }
@@ -286,6 +321,10 @@ export type Something =
   | {
       tag: "f64";
       value: number;
+    }
+  | {
+      tag: "blob";
+      value: Uint8Array;
     };
 
 interface ExportsInterface {
@@ -296,6 +335,7 @@ interface ExportsInterface {
   something_pop_from_stack(): number;
   something_push_null_to_stack(): void;
   something_push_string(): void;
+  something_push_blob(size: number): void;
   table_create(): number;
   table_insert(tableID: number, col: number): void;
   table_get_row(tableID: number): void;
@@ -328,6 +368,8 @@ class Ops {
       this.pushStringToStack(value.value);
     } else if (value.tag === "f64") {
       this.somethingPushf64ToStack(value.value);
+    } else if (value.tag === "blob") {
+      this.somethingPushBlobToStack(value.value);
     } else if (value.tag === "null") {
       this.pushNullToStack();
     }
@@ -339,6 +381,11 @@ class Ops {
 
   pushNullToStack(): void {
     this.exports.something_push_null_to_stack();
+  }
+
+  somethingPushBlobToStack(value: Uint8Array): void {
+    pushBlobToStack(value);
+    this.exports.something_push_blob(value.length);
   }
 
   somethingPushf64ToStack(value: number): void {

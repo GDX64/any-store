@@ -6,12 +6,14 @@ const NULL_TAG: u8 = 2;
 const FLOAT_TAG: u8 = 3;
 pub const ROW_TAG: u8 = 4;
 pub const TABLE_TAG: u8 = 5;
+pub const BLOB_TAG: u8 = 6;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Something {
     Int(i32),
     Float(f64),
     String(Vec<u8>),
+    Blob(Vec<u8>),
     Null,
 }
 
@@ -29,6 +31,7 @@ impl Something {
             String(_) => VALUE_STRING_TAG,
             Null => NULL_TAG,
             Float(_) => FLOAT_TAG,
+            Blob(_) => BLOB_TAG,
         }
     }
 
@@ -52,6 +55,9 @@ impl Hash for Something {
                 let bits = v.to_le_bytes();
                 bits.hash(state);
             }
+            Blob(v) => {
+                v.hash(state);
+            }
             Null => {}
         }
     }
@@ -64,6 +70,8 @@ impl Ord for Something {
         match (self, other) {
             (Int(a), Int(b)) => a.cmp(b),
             (String(a), String(b)) => a.cmp(b),
+            (Float(a), Float(b)) => a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal),
+            (Blob(a), Blob(b)) => a.cmp(b),
             (Null, Null) => std::cmp::Ordering::Equal,
             (Null, _) => std::cmp::Ordering::Less,
             (_, Null) => std::cmp::Ordering::Greater,

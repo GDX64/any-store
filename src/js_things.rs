@@ -191,6 +191,20 @@ fn something_push_f64_to_stack(value: f64) {
     push_to_something_stack(something);
 }
 
+#[unsafe(no_mangle)]
+fn something_push_blob() -> Option<()> {
+    let len = safe_read_blob_length();
+    let mut bytes = Vec::with_capacity(len);
+    for i in 0..len {
+        let byte = safe_read_blob_byte(i);
+        bytes.push(byte);
+    }
+    safe_js_pop_stack();
+    let something = Something::Blob(bytes);
+    push_to_something_stack(something);
+    return Some(());
+}
+
 fn add_something_to_js_stack(value: &Something) {
     match value {
         Something::Int(v) => {
@@ -200,6 +214,12 @@ fn add_something_to_js_stack(value: &Something) {
             safe_create_string();
             for byte in s {
                 safe_push_to_string(*byte);
+            }
+        }
+        Something::Blob(b) => {
+            safe_create_blob(b.len());
+            for byte in b {
+                safe_push_to_blob(*byte);
             }
         }
         Something::Null => {
@@ -224,6 +244,10 @@ unsafe extern "C" {
     unsafe fn js_put_f64(value: f64);
     unsafe fn js_log_stack_value();
     unsafe fn js_push_null();
+    unsafe fn js_create_blob(size: usize);
+    unsafe fn js_push_to_blob(byte: u8);
+    unsafe fn js_read_blob_length() -> usize;
+    unsafe fn js_read_blob_byte(index: usize) -> u8;
 }
 
 #[link(wasm_import_module = "env")]
@@ -300,4 +324,28 @@ fn log_string(message: &str) {
         safe_push_to_string(*byte);
     }
     safe_log_stack_value();
+}
+
+fn safe_create_blob(size: usize) {
+    unsafe {
+        js_create_blob(size);
+    }
+}
+
+fn safe_push_to_blob(byte: u8) {
+    unsafe {
+        js_push_to_blob(byte);
+    }
+}
+
+fn safe_read_blob_length() -> usize {
+    unsafe {
+        return js_read_blob_length();
+    }
+}
+
+fn safe_read_blob_byte(index: usize) -> u8 {
+    unsafe {
+        return js_read_blob_byte(index);
+    }
 }
