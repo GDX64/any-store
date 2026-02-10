@@ -17,7 +17,7 @@ impl<T> MyRwLock<T> {
                 Ok(guard) => return guard,
                 Err(_) => {
                     let start = performance_now();
-                    while performance_now() - start < 1.0 {
+                    while performance_now() - start < 0.1 {
                         // spin
                     }
                 }
@@ -31,7 +31,7 @@ impl<T> MyRwLock<T> {
                 Ok(guard) => return guard,
                 Err(_) => {
                     let start = performance_now();
-                    while performance_now() - start < 1.0 {
+                    while performance_now() - start < 0.1 {
                         // spin
                     }
                 }
