@@ -192,6 +192,17 @@ fn something_push_f64_to_stack(value: f64) {
 }
 
 #[unsafe(no_mangle)]
+fn delete_row_from_table(table_id: usize) -> Option<()> {
+    let something = pop_from_something_stack()?;
+    GLOBALS.with_db_mut(|db| {
+        db.get_table_mut(table_id).map(|table| {
+            table.delete_row(&something);
+        });
+    });
+    return Some(());
+}
+
+#[unsafe(no_mangle)]
 fn something_push_blob() -> Option<()> {
     let len = safe_read_blob_length();
     let mut bytes = Vec::with_capacity(len);

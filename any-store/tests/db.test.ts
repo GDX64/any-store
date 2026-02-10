@@ -27,6 +27,8 @@ describe("Database Module", () => {
     expect(row1.get("age")).toBe(30);
     expect(row1.get("height")).toBeCloseTo(1.75);
     expect(row1.get("data")).toEqual(new Uint8Array([1, 2, 3]));
+    row1.delete();
+    expect(row1.get("name")).toBeNull();
 
     const row2 = table.row(WDB.i32(0));
     expect(row2.get("name")).toBe("Bob");

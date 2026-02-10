@@ -70,6 +70,10 @@ impl Table {
         }
     }
 
+    pub fn delete_row(&mut self, key: &Something) {
+        self.items.remove(key);
+    }
+
     pub fn get(&self, key: &Something) -> Option<&Row> {
         return self.items.get(key);
     }

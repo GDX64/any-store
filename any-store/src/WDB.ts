@@ -197,6 +197,11 @@ export class WDB {
     return value ?? null;
   }
 
+  deleteRowFromTable(tableID: number, key: Something) {
+    this.ops.putSomethingOnStack(key);
+    this.ops.deleteRowFromTable(tableID);
+  }
+
   getRowFromTable(tableID: number, key: Something): Something["value"][] {
     this.ops.putSomethingOnStack(key);
     this.ops.getRowFromTable(tableID);
@@ -281,6 +286,10 @@ export class Table<T extends ColMap> {
     return this.wdb.getFromTable(this.id, key, col!);
   }
 
+  deleteRow(key: Something) {
+    this.wdb.deleteRowFromTable(this.id, key);
+  }
+
   row(key: Something) {
     return new Row<T>(this, key);
   }
@@ -294,6 +303,10 @@ export class Row<T extends ColMap> {
 
   get<K extends keyof T>(colName: K): Something["value"] | null {
     return this.table.get(this.key, colName);
+  }
+
+  delete() {
+    return this.table.deleteRow(this.key);
   }
 
   update<K extends keyof T>(colName: K, value: Something) {
@@ -343,6 +356,7 @@ interface ExportsInterface {
   table_get_something(tableID: number, col: number): void;
   table_insert_row(tableID: number): void;
   string_take(strIdx: number): number;
+  delete_row_from_table(tableID: number): void;
   start(): void;
 }
 
@@ -373,6 +387,10 @@ class Ops {
     } else if (value.tag === "null") {
       this.pushNullToStack();
     }
+  }
+
+  deleteRowFromTable(tableID: number): void {
+    this.exports.delete_row_from_table(tableID);
   }
 
   getRowFromTable(tableID: number): void {
