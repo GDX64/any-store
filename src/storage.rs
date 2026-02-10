@@ -36,7 +36,7 @@ impl Database {
     pub fn new() -> Self {
         Database {
             last_table_id: 0,
-            tables: HashMap::new(),
+            tables: HashMap::default(),
         }
     }
 
@@ -52,7 +52,7 @@ impl Database {
         return Some(thing);
     }
 
-    pub fn get_table<'a>(&'a self, table_id: usize) -> Option<&Table> {
+    pub fn get_table<'a>(&'a self, table_id: usize) -> Option<&'a Table> {
         let thing = self.tables.get(&table_id)?;
         return Some(thing);
     }
