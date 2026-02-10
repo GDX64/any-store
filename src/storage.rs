@@ -4,11 +4,29 @@ use std::{collections::HashMap, hash::Hash};
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Row {
     values: Vec<Something>,
+    listeners: Option<Vec<u32>>,
 }
 
 impl Row {
     pub fn new() -> Self {
-        Row { values: Vec::new() }
+        Row {
+            values: Vec::new(),
+            listeners: None,
+        }
+    }
+
+    pub fn add_listener(&mut self, listener_id: u32) {
+        if let Some(listeners) = &mut self.listeners {
+            listeners.push(listener_id);
+        } else {
+            self.listeners = Some(vec![listener_id]);
+        }
+    }
+
+    pub fn notify(&self, arr: &mut Vec<u32>) {
+        if let Some(listeners) = &self.listeners {
+            arr.extend_from_slice(listeners);
+        }
     }
 
     pub fn insert_at(&mut self, value: Something, index: usize) {
@@ -30,6 +48,7 @@ impl Row {
 pub struct Database {
     last_table_id: usize,
     tables: HashMap<usize, Table>,
+    next_listener_id: u32,
 }
 
 impl Database {
@@ -37,7 +56,16 @@ impl Database {
         Database {
             last_table_id: 0,
             tables: HashMap::default(),
+            next_listener_id: 0,
         }
+    }
+
+    pub fn add_listener_to(&mut self, table_id: usize, key: &Something) -> Option<u32> {
+        let table = self.tables.get_mut(&table_id)?;
+        let listener_id = self.next_listener_id;
+        self.next_listener_id += 1;
+        table.add_listener(listener_id, key)?;
+        return Some(listener_id);
     }
 
     pub fn create_table(&mut self) -> usize {
@@ -61,13 +89,21 @@ impl Database {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Table {
     items: HashMap<Something, Row>,
+    notifications: Vec<u32>,
 }
 
 impl Table {
     pub fn new() -> Self {
         Table {
             items: HashMap::new(),
+            notifications: Vec::new(),
         }
+    }
+
+    pub fn add_listener(&mut self, listener_id: u32, key: &Something) -> Option<()> {
+        let row = self.items.entry(key.clone()).or_insert_with(Row::new);
+        row.add_listener(listener_id);
+        return Some(());
     }
 
     pub fn delete_row(&mut self, key: &Something) {
@@ -84,8 +120,11 @@ impl Table {
 
     pub fn insert_row(&mut self, mut values: Vec<Something>) -> Option<()> {
         let key = values.pop()?;
-        let row = Row { values };
-        self.items.insert(key, row);
+        let row = self.items.entry(key).or_insert_with(|| {
+            return Row::new();
+        });
+        row.values = values;
+        row.notify(&mut self.notifications);
         Some(())
     }
 
@@ -93,10 +132,14 @@ impl Table {
         let e = self.items.entry(key);
         let row = e.or_insert_with(Row::new);
         row.insert_at(value, index);
+        row.notify(&mut self.notifications);
     }
 
     pub fn remove(&mut self, key: &Something) {
-        self.items.remove(key);
+        let row = self.items.remove(key);
+        if let Some(row) = row {
+            row.notify(&mut self.notifications);
+        }
     }
 
     pub fn rows_with<'a>(&'a self, f: impl Fn(&Row) -> bool + 'a) -> impl Iterator<Item = &'a Row> {

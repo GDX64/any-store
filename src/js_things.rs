@@ -212,6 +212,18 @@ fn delete_row_from_table(table_id: usize) -> Option<()> {
 }
 
 #[unsafe(no_mangle)]
+fn table_add_listener_to_row(table_id: usize) -> i32 {
+    fn inner(table_id: usize) -> Option<u32> {
+        let something = pop_from_something_stack()?;
+        let id = GLOBALS.with_db_mut(|db| {
+            return db.add_listener_to(table_id, &something);
+        })?;
+        return id;
+    }
+    return inner(table_id).map(|id| id as i32).unwrap_or(-1);
+}
+
+#[unsafe(no_mangle)]
 fn something_push_blob() -> Option<()> {
     let len = safe_read_blob_length();
     let mut bytes = Vec::with_capacity(len);

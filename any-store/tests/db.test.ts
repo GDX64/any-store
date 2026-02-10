@@ -83,4 +83,13 @@ describe("Database Module", () => {
       });
     }
   });
+
+  test("add listener to row", async () => {
+    const wdb = await WDB.create(0, data);
+    const table = wdb.createTable({
+      counter: "i32",
+    });
+    const row = table.row(WDB.i32(1));
+    row.addListener();
+  });
 });

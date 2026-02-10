@@ -186,6 +186,11 @@ export class WDB {
     this.ops.tableInsert(tableID, col);
   }
 
+  addListenerToRow(tableID: number, key: Something) {
+    const result = this.ops.addListenerToRow(tableID, key);
+    console.log(result);
+  }
+
   getFromTable(
     tableID: number,
     key: Something,
@@ -268,6 +273,10 @@ export class Table<T extends ColMap> {
     });
   }
 
+  addListenerToRow(key: Something) {
+    return this.wdb.addListenerToRow(this.id, key);
+  }
+
   getRow(key: Something): Something["value"][] {
     return this.wdb.getRowFromTable(this.id, key);
   }
@@ -303,6 +312,10 @@ export class Row<T extends ColMap> {
 
   get<K extends keyof T>(colName: K): Something["value"] | null {
     return this.table.get(this.key, colName);
+  }
+
+  addListener() {
+    return this.table.addListenerToRow(this.key);
   }
 
   delete() {
@@ -352,6 +365,7 @@ interface ExportsInterface {
   table_create(): number;
   table_insert(tableID: number, col: number): void;
   table_get_row(tableID: number): void;
+  table_add_listener_to_row(tableID: number): number;
   commit_ops(): void;
   table_get_something(tableID: number, col: number): void;
   table_insert_row(tableID: number): void;
@@ -408,6 +422,11 @@ class Ops {
 
   somethingPushf64ToStack(value: number): void {
     this.exports.something_push_f64_to_stack(value);
+  }
+
+  addListenerToRow(tableID: number, key: Something): number {
+    this.putSomethingOnStack(key);
+    return this.exports.table_add_listener_to_row(tableID);
   }
 
   somethingPushi32ToStack(value: number): void {
