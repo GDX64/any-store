@@ -17,6 +17,10 @@ enum Operation {
         value: Something,
         index: usize,
     },
+    RowDelete {
+        table_id: usize,
+        key: Something,
+    },
 }
 
 static SOMETHING_STACK: LazyLock<MyRwLock<[Vec<Something>; 16]>> =
@@ -146,6 +150,11 @@ fn commit_ops() {
                         return table.insert_at(key, value, index);
                     });
                 }
+                Operation::RowDelete { table_id, key } => {
+                    db.get_table_mut(table_id).map(|table| {
+                        table.delete_row(&key);
+                    });
+                }
             }
         }
     });
@@ -194,10 +203,10 @@ fn something_push_f64_to_stack(value: f64) {
 #[unsafe(no_mangle)]
 fn delete_row_from_table(table_id: usize) -> Option<()> {
     let something = pop_from_something_stack()?;
-    GLOBALS.with_db_mut(|db| {
-        db.get_table_mut(table_id).map(|table| {
-            table.delete_row(&something);
-        });
+    let mut stack = OPERATION_STACK.write();
+    stack[worker_id()].push(Operation::RowDelete {
+        table_id,
+        key: something,
     });
     return Some(());
 }
