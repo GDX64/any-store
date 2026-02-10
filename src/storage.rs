@@ -15,6 +15,14 @@ impl Row {
         }
     }
 
+    pub fn remove_listener(&mut self, listener_id: u32) -> Option<()> {
+        if let Some(listeners) = &mut self.listeners {
+            listeners.retain(|id| *id != listener_id);
+            return Some(());
+        }
+        return None;
+    }
+
     pub fn add_listener(&mut self, listener_id: u32) {
         if let Some(listeners) = &mut self.listeners {
             listeners.push(listener_id);
@@ -71,6 +79,18 @@ impl Database {
         return notifications;
     }
 
+    pub fn remove_listener(
+        &mut self,
+        table_id: usize,
+        key: &Something,
+        listener_id: u32,
+    ) -> Option<()> {
+        self.tables
+            .get_mut(&table_id)?
+            .remove_listener(key, listener_id);
+        return Some(());
+    }
+
     pub fn add_listener_to(&mut self, table_id: usize, key: &Something) -> Option<u32> {
         let table = self.tables.get_mut(&table_id)?;
         let listener_id = self.next_listener_id;
@@ -109,6 +129,11 @@ impl Table {
             items: HashMap::new(),
             notifications: Vec::new(),
         }
+    }
+
+    pub fn remove_listener(&mut self, key: &Something, listener_id: u32) -> Option<()> {
+        self.items.get_mut(key)?.remove_listener(listener_id);
+        return Some(());
     }
 
     pub fn take_notifications(&mut self) -> Vec<u32> {

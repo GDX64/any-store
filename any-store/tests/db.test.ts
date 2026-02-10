@@ -91,11 +91,19 @@ describe("Database Module", () => {
     });
     const row = table.row(WDB.i32(1));
     const fn = vi.fn();
-    row.addListener(fn);
+    const listenerID = row.addListener(fn);
     wdb.notifyAll();
     expect(fn).toHaveBeenCalledTimes(0);
 
     row.update("counter", WDB.i32(0));
+    wdb.commit();
+
+    wdb.notifyAll();
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    row.removeListener(listenerID);
+
+    row.update("counter", WDB.i32(1));
     wdb.commit();
 
     wdb.notifyAll();

@@ -212,6 +212,15 @@ fn delete_row_from_table(table_id: usize) -> Option<()> {
 }
 
 #[unsafe(no_mangle)]
+fn table_remove_listener(table_id: usize, listener_id: u32) -> Option<()> {
+    let key = pop_from_something_stack()?;
+    GLOBALS.with_db_mut(|db| {
+        db.remove_listener(table_id, &key, listener_id);
+    });
+    return Some(());
+}
+
+#[unsafe(no_mangle)]
 fn db_take_notifications() -> Option<()> {
     let notifications = GLOBALS.with_db_mut(|db| {
         return db.take_notifications();

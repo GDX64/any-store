@@ -195,7 +195,8 @@ export class WDB {
   }
 
   notifyAll() {
-    this.ops.takeNotifications().forEach((id) => {
+    const arr = this.ops.takeNotifications();
+    arr.forEach((id) => {
       const listener = this.listeners.get(id);
       listener?.();
     });
@@ -215,6 +216,11 @@ export class WDB {
   deleteRowFromTable(tableID: number, key: Something) {
     this.ops.putSomethingOnStack(key);
     this.ops.deleteRowFromTable(tableID);
+  }
+
+  removeListenerFromRow(tableID: number, key: Something, listenerID: number) {
+    this.listeners.delete(listenerID);
+    this.ops.removeListenerFromRow(tableID, key, listenerID);
   }
 
   getRowFromTable(tableID: number, key: Something): Something["value"][] {
@@ -296,6 +302,10 @@ export class Table<T extends ColMap> {
     this.wdb.insertOnTable(this.id, col!, key, value);
   }
 
+  removeListenerFromRow(key: Something, listenerID: number) {
+    this.wdb.removeListenerFromRow(this.id, key, listenerID);
+  }
+
   insertRow(key: Something, values: Something[]) {
     this.wdb.insertRowOnTable(this.id, key, values);
   }
@@ -334,6 +344,10 @@ export class Row<T extends ColMap> {
 
   update<K extends keyof T>(colName: K, value: Something) {
     this.table.insert(this.key, value, colName);
+  }
+
+  removeListener(listenerID: number) {
+    this.table.removeListenerFromRow(this.key, listenerID);
   }
 
   getRow(): Something["value"][] {
@@ -377,6 +391,7 @@ interface ExportsInterface {
   table_insert(tableID: number, col: number): void;
   table_get_row(tableID: number): void;
   table_add_listener_to_row(tableID: number): number;
+  table_remove_listener(tableID: number, listenerID: number): void;
   commit_ops(): void;
   table_get_something(tableID: number, col: number): void;
   table_insert_row(tableID: number): void;
@@ -412,6 +427,11 @@ class Ops {
     } else if (value.tag === "null") {
       this.pushNullToStack();
     }
+  }
+
+  removeListenerFromRow(tableID: number, key: Something, listenerID: number) {
+    this.putSomethingOnStack(key);
+    this.exports.table_remove_listener(tableID, listenerID);
   }
 
   deleteRowFromTable(tableID: number): void {
