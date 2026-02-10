@@ -11,7 +11,7 @@ impl<T> MyRwLock<T> {
         }
     }
 
-    pub fn read(&self) -> std::sync::RwLockReadGuard<T> {
+    pub fn read<'a>(&'a self) -> std::sync::RwLockReadGuard<'a, T> {
         loop {
             match self.inner.try_read() {
                 Ok(guard) => return guard,
@@ -25,7 +25,7 @@ impl<T> MyRwLock<T> {
         }
     }
 
-    pub fn write(&self) -> std::sync::RwLockWriteGuard<T> {
+    pub fn write<'a>(&'a self) -> std::sync::RwLockWriteGuard<'a, T> {
         loop {
             match self.inner.try_write() {
                 Ok(guard) => return guard,
