@@ -100,6 +100,8 @@ const ops = {
 
 export class WDB {
   private ops: Ops;
+  private listeners: Map<number, () => void> = new Map();
+
   constructor(
     wasmInstance: WebAssembly.Instance,
     private memory: WebAssembly.Memory,
@@ -186,9 +188,17 @@ export class WDB {
     this.ops.tableInsert(tableID, col);
   }
 
-  addListenerToRow(tableID: number, key: Something) {
+  addListenerToRow(tableID: number, key: Something, fn: () => void) {
     const result = this.ops.addListenerToRow(tableID, key);
-    console.log(result);
+    this.listeners.set(result, fn);
+    return result;
+  }
+
+  notifyAll() {
+    this.ops.takeNotifications().forEach((id) => {
+      const listener = this.listeners.get(id);
+      listener?.();
+    });
   }
 
   getFromTable(
@@ -273,8 +283,8 @@ export class Table<T extends ColMap> {
     });
   }
 
-  addListenerToRow(key: Something) {
-    return this.wdb.addListenerToRow(this.id, key);
+  addListenerToRow(key: Something, fn: () => void) {
+    return this.wdb.addListenerToRow(this.id, key, fn);
   }
 
   getRow(key: Something): Something["value"][] {
@@ -314,8 +324,8 @@ export class Row<T extends ColMap> {
     return this.table.get(this.key, colName);
   }
 
-  addListener() {
-    return this.table.addListenerToRow(this.key);
+  addListener(fn: () => void) {
+    return this.table.addListenerToRow(this.key, fn);
   }
 
   delete() {
@@ -362,6 +372,7 @@ interface ExportsInterface {
   something_push_null_to_stack(): void;
   something_push_string(): void;
   something_push_blob(size: number): void;
+  db_take_notifications(): void;
   table_create(): number;
   table_insert(tableID: number, col: number): void;
   table_get_row(tableID: number): void;
@@ -422,6 +433,11 @@ class Ops {
 
   somethingPushf64ToStack(value: number): void {
     this.exports.something_push_f64_to_stack(value);
+  }
+
+  takeNotifications(): number[] {
+    this.exports.db_take_notifications();
+    return getWholeStack();
   }
 
   addListenerToRow(tableID: number, key: Something): number {

@@ -212,6 +212,19 @@ fn delete_row_from_table(table_id: usize) -> Option<()> {
 }
 
 #[unsafe(no_mangle)]
+fn db_take_notifications() -> Option<()> {
+    let notifications = GLOBALS.with_db_mut(|db| {
+        return db.take_notifications();
+    })?;
+
+    for notification in notifications {
+        safe_put_i32(notification as i32);
+    }
+
+    return Some(());
+}
+
+#[unsafe(no_mangle)]
 fn table_add_listener_to_row(table_id: usize) -> i32 {
     fn inner(table_id: usize) -> Option<u32> {
         let something = pop_from_something_stack()?;

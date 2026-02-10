@@ -60,6 +60,17 @@ impl Database {
         }
     }
 
+    pub fn take_notifications(&mut self) -> Vec<u32> {
+        let notifications = self
+            .tables
+            .values_mut()
+            .flat_map(|table| {
+                return table.take_notifications().into_iter();
+            })
+            .collect();
+        return notifications;
+    }
+
     pub fn add_listener_to(&mut self, table_id: usize, key: &Something) -> Option<u32> {
         let table = self.tables.get_mut(&table_id)?;
         let listener_id = self.next_listener_id;
@@ -98,6 +109,10 @@ impl Table {
             items: HashMap::new(),
             notifications: Vec::new(),
         }
+    }
+
+    pub fn take_notifications(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.notifications)
     }
 
     pub fn add_listener(&mut self, listener_id: u32, key: &Something) -> Option<()> {

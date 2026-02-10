@@ -1,6 +1,6 @@
 import fs from "fs";
 import { WDB } from "../src/WDB";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 const wasmPath = "../target/wasm32-unknown-unknown/release/any_store.wasm";
 
 const data = fs.readFileSync(wasmPath);
@@ -90,6 +90,15 @@ describe("Database Module", () => {
       counter: "i32",
     });
     const row = table.row(WDB.i32(1));
-    row.addListener();
+    const fn = vi.fn();
+    row.addListener(fn);
+    wdb.notifyAll();
+    expect(fn).toHaveBeenCalledTimes(0);
+
+    row.update("counter", WDB.i32(0));
+    wdb.commit();
+
+    wdb.notifyAll();
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 });
