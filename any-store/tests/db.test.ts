@@ -29,6 +29,7 @@ describe("Database Module", () => {
     expect(row1.get("data")).toEqual(new Uint8Array([1, 2, 3]));
     row1.delete();
     wdb.commit();
+
     expect(row1.get("name")).toBeNull();
 
     const row2 = table.row(WDB.i32(0));
