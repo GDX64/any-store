@@ -372,7 +372,7 @@ fn safe_log_stack_value() {
     }
 }
 
-fn log_string(message: &str) {
+pub fn log_string(message: &str) {
     safe_create_string();
     for byte in message.as_bytes() {
         safe_push_to_string(*byte);

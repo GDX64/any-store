@@ -3,8 +3,7 @@ rustflags = [
   "-C", "target-feature=+atomics,+bulk-memory,+mutable-globals,+simd128",
   "-C", "link-arg=--shared-memory",
   "-C", "link-arg=--max-memory=1073741824",
-  "-C", "link-arg=--import-memory",
-  "-C", "inline-threshold=0",  # Disable all inlining
+  "-C", "link-arg=--import-memory"
 ]
 
 [unstable]

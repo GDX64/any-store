@@ -9,8 +9,8 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [profile.release]
-strip = true
-## debug = true
+strip = false
+debug = true
 ## panic = "abort"
 opt-level = 3
 lto = true
