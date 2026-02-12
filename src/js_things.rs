@@ -2,42 +2,20 @@ use std::{mem, sync::LazyLock};
 
 use crate::{
     my_rwlock::MyRwLock,
-    storage::{Database, Table},
+    storage::{Database, Operation, Table},
     value::Something,
 };
 
-enum Operation {
-    InsertRow {
-        table_id: usize,
-        data: Vec<Something>,
-    },
-    Insert {
-        table_id: usize,
-        key: Something,
-        value: Something,
-        index: usize,
-    },
-    RowDelete {
-        table_id: usize,
-        key: Something,
-    },
-}
-
-static SOMETHING_STACK: LazyLock<MyRwLock<[Vec<Something>; 16]>> =
-    LazyLock::new(|| MyRwLock::new(Default::default()));
-static OPERATION_STACK: LazyLock<MyRwLock<[Vec<Operation>; 16]>> =
-    LazyLock::new(|| MyRwLock::new(Default::default()));
-
 fn push_to_something_stack(value: Something) {
-    let mut stack = SOMETHING_STACK.write();
-    let worker_id = worker_id();
-    stack[worker_id].push(value);
+    GLOBALS.with_db_mut(|db| {
+        db.something_stack[worker_id()].push(value);
+    });
 }
 
 fn pop_from_something_stack() -> Option<Something> {
-    let mut stack = SOMETHING_STACK.write();
-    let worker_id = worker_id();
-    return stack[worker_id].pop();
+    return GLOBALS.with_db_mut(|db| {
+        return db.something_stack[worker_id()].pop();
+    })?;
 }
 
 struct GlobalPool {
@@ -118,12 +96,13 @@ pub fn table_get_row(table: usize) -> Option<()> {
 fn table_insert(table: usize, col: usize) -> Option<()> {
     let value = pop_from_something_stack()?;
     let key = pop_from_something_stack()?;
-    let mut stack = OPERATION_STACK.write();
-    stack[worker_id()].push(Operation::Insert {
-        table_id: table,
-        key,
-        value,
-        index: col,
+    GLOBALS.with_db_mut(|db| {
+        db.operation_stack[worker_id()].push(Operation::Insert {
+            table_id: table,
+            key,
+            value,
+            index: col,
+        });
     });
     return Some(());
 }
@@ -131,8 +110,7 @@ fn table_insert(table: usize, col: usize) -> Option<()> {
 #[unsafe(no_mangle)]
 fn commit_ops() {
     GLOBALS.with_db_mut(|db| {
-        let mut val = OPERATION_STACK.write();
-        let ops = std::mem::take(&mut val[worker_id()]);
+        let ops = mem::take(&mut db.operation_stack[worker_id()]);
         for op in ops {
             match op {
                 Operation::InsertRow { table_id, data } => {
@@ -162,14 +140,12 @@ fn commit_ops() {
 
 #[unsafe(no_mangle)]
 fn table_insert_row(table: usize) -> Option<()> {
-    let v = {
-        let mut val = SOMETHING_STACK.write();
-        mem::take(&mut val[worker_id()])
-    };
-    let mut stack = OPERATION_STACK.write();
-    stack[worker_id()].push(Operation::InsertRow {
-        table_id: table,
-        data: v,
+    GLOBALS.with_db_mut(|db| {
+        let v = { mem::take(&mut db.something_stack[worker_id()]) };
+        db.operation_stack[worker_id()].push(Operation::InsertRow {
+            table_id: table,
+            data: v,
+        });
     });
     return Some(());
 }
@@ -203,10 +179,11 @@ fn something_push_f64_to_stack(value: f64) {
 #[unsafe(no_mangle)]
 fn delete_row_from_table(table_id: usize) -> Option<()> {
     let something = pop_from_something_stack()?;
-    let mut stack = OPERATION_STACK.write();
-    stack[worker_id()].push(Operation::RowDelete {
-        table_id,
-        key: something,
+    GLOBALS.with_db_mut(|db| {
+        db.operation_stack[worker_id()].push(Operation::RowDelete {
+            table_id,
+            key: something,
+        });
     });
     return Some(());
 }

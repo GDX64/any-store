@@ -57,6 +57,25 @@ pub struct Database {
     last_table_id: usize,
     tables: HashMap<usize, Table>,
     next_listener_id: u32,
+    pub something_stack: [Vec<Something>; 16],
+    pub operation_stack: [Vec<Operation>; 16],
+}
+
+pub enum Operation {
+    InsertRow {
+        table_id: usize,
+        data: Vec<Something>,
+    },
+    Insert {
+        table_id: usize,
+        key: Something,
+        value: Something,
+        index: usize,
+    },
+    RowDelete {
+        table_id: usize,
+        key: Something,
+    },
 }
 
 impl Database {
@@ -65,6 +84,8 @@ impl Database {
             last_table_id: 0,
             tables: HashMap::default(),
             next_listener_id: 0,
+            something_stack: Default::default(),
+            operation_stack: Default::default(),
         }
     }
 
