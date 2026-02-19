@@ -22,8 +22,8 @@ impl<T> MyRwLock<T> {
 
     pub fn read<'a>(&'a self) -> ReadGuard<'a, T> {
         loop {
-            let was_free = self.is_locked.swap(true, Ordering::Acquire);
-            if was_free {
+            let was_locked = self.is_locked.swap(true, Ordering::Acquire);
+            if !was_locked {
                 return ReadGuard { rwlock: &self };
             } else {
                 std::hint::spin_loop();
@@ -33,8 +33,8 @@ impl<T> MyRwLock<T> {
 
     pub fn write<'a>(&'a self) -> WriteGuard<'a, T> {
         loop {
-            let was_free = self.is_locked.swap(true, Ordering::Acquire);
-            if was_free {
+            let was_locked = self.is_locked.swap(true, Ordering::Acquire);
+            if !was_locked {
                 return WriteGuard { rwlock: &self };
             } else {
                 std::hint::spin_loop();
