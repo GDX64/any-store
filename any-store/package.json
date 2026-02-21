@@ -20,7 +20,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "bench": "vitest bench",
-    "test:browser": "vitest --config=vitest.browser.config.ts"
+    "test:browser": "vitest --config=vitest.browser.config.ts",
+    "test-ci": "vitest --run && vitest --config=vitest.browser.config.ts --run && cargo test"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",
