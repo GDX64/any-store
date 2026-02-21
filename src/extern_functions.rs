@@ -132,10 +132,12 @@ mod extern_functions_mod {
         }
     }
 
-    /**
-     * this is just to fill the tests
-     */
+    // this is just to fill the tests
     pub fn pop_mock_stack() -> Option<MockValue> {
+        panic!("Not implemented in wasm");
+    }
+
+    pub fn set_worker_id(_id: i32) {
         panic!("Not implemented in wasm");
     }
 }
