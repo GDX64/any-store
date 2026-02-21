@@ -1,7 +1,4 @@
-#[cfg(not(target_arch = "wasm32"))]
-pub use thread_local_extern_functions::*;
-#[cfg(target_arch = "wasm32")]
-pub use wasm::*;
+pub use extern_functions_mod::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MockValue {
@@ -12,7 +9,8 @@ pub enum MockValue {
     Null,
 }
 
-mod wasm {
+#[cfg(target_arch = "wasm32")]
+mod extern_functions_mod {
     use crate::extern_functions::MockValue;
 
     #[link(wasm_import_module = "ops")]
@@ -142,7 +140,8 @@ mod wasm {
     }
 }
 
-mod thread_local_extern_functions {
+#[cfg(not(target_arch = "wasm32"))]
+mod extern_functions_mod {
 
     use std::cell::RefCell;
 
