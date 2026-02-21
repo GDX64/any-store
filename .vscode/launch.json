@@ -1,0 +1,16 @@
+{
+  "configurations": [
+    {
+      "type": "lldb-dap",
+      "request": "launch",
+      "name": "test-mod ",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}\\target\\debug\\deps\\tests-79292f0cc2080744.exe",
+      "env": [
+        "RUST_BACKTRACE=short",
+        "RUSTC_TOOLCHAIN=C:\\Users\\gadum\\.rustup\\toolchains\\nightly-x86_64-pc-windows-msvc"
+      ],
+      "args": ["", "--nocapture"]
+    }
+  ]
+}

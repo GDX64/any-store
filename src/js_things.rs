@@ -1,10 +1,10 @@
-use std::{mem, sync::LazyLock};
-
 use crate::{
+    extern_functions::*,
     my_rwlock::MyRwLock,
     storage::{Database, Operation, Table},
     value::Something,
 };
+use std::{mem, sync::LazyLock};
 
 fn push_to_something_stack(value: Something) {
     GLOBALS.with_db_mut(|db| {
@@ -93,7 +93,7 @@ pub fn table_get_row(table: usize) -> Option<()> {
 }
 
 #[unsafe(no_mangle)]
-fn table_insert(table: usize, col: usize) -> Option<()> {
+pub fn table_insert(table: usize, col: usize) -> Option<()> {
     let value = pop_from_something_stack()?;
     let key = pop_from_something_stack()?;
     GLOBALS.with_db_mut(|db| {
@@ -108,7 +108,7 @@ fn table_insert(table: usize, col: usize) -> Option<()> {
 }
 
 #[unsafe(no_mangle)]
-fn commit_ops() {
+pub fn commit_ops() {
     GLOBALS.with_db_mut(|db| {
         let ops = mem::take(&mut db.operation_stack[worker_id()]);
         for op in ops {
@@ -139,7 +139,7 @@ fn commit_ops() {
 }
 
 #[unsafe(no_mangle)]
-fn table_insert_row(table: usize) -> Option<()> {
+pub fn table_insert_row(table: usize) -> Option<()> {
     GLOBALS.with_db_mut(|db| {
         let v = { mem::take(&mut db.something_stack[worker_id()]) };
         db.operation_stack[worker_id()].push(Operation::InsertRow {
@@ -157,7 +157,7 @@ pub fn something_push_i32_to_stack(value: i32) {
 }
 
 #[unsafe(no_mangle)]
-fn something_push_string() -> Option<()> {
+pub fn something_push_string() -> Option<()> {
     let len = safe_read_string_length();
     let mut bytes = Vec::with_capacity(len);
     for i in 0..len {
@@ -171,13 +171,13 @@ fn something_push_string() -> Option<()> {
 }
 
 #[unsafe(no_mangle)]
-fn something_push_f64_to_stack(value: f64) {
+pub fn something_push_f64_to_stack(value: f64) {
     let something = Something::Float(value);
     push_to_something_stack(something);
 }
 
 #[unsafe(no_mangle)]
-fn delete_row_from_table(table_id: usize) -> Option<()> {
+pub fn delete_row_from_table(table_id: usize) -> Option<()> {
     let something = pop_from_something_stack()?;
     GLOBALS.with_db_mut(|db| {
         db.operation_stack[worker_id()].push(Operation::RowDelete {
@@ -189,7 +189,7 @@ fn delete_row_from_table(table_id: usize) -> Option<()> {
 }
 
 #[unsafe(no_mangle)]
-fn table_remove_listener(table_id: usize, listener_id: u32) -> Option<()> {
+pub fn table_remove_listener(table_id: usize, listener_id: u32) -> Option<()> {
     let key = pop_from_something_stack()?;
     GLOBALS.with_db_mut(|db| {
         db.remove_listener(table_id, &key, listener_id);
@@ -198,7 +198,7 @@ fn table_remove_listener(table_id: usize, listener_id: u32) -> Option<()> {
 }
 
 #[unsafe(no_mangle)]
-fn db_take_notifications() -> Option<()> {
+pub fn db_take_notifications() -> Option<()> {
     let notifications = GLOBALS.with_db_mut(|db| {
         return db.take_notifications();
     })?;
@@ -211,7 +211,7 @@ fn db_take_notifications() -> Option<()> {
 }
 
 #[unsafe(no_mangle)]
-fn table_add_listener_to_row(table_id: usize) -> i32 {
+pub fn table_add_listener_to_row(table_id: usize) -> i32 {
     fn inner(table_id: usize) -> Option<u32> {
         let something = pop_from_something_stack()?;
         let id = GLOBALS.with_db_mut(|db| {
@@ -223,7 +223,7 @@ fn table_add_listener_to_row(table_id: usize) -> i32 {
 }
 
 #[unsafe(no_mangle)]
-fn something_push_blob() -> Option<()> {
+pub fn something_push_blob() -> Option<()> {
     let len = safe_read_blob_length();
     let mut bytes = Vec::with_capacity(len);
     for i in 0..len {
@@ -259,124 +259,5 @@ fn add_something_to_js_stack(value: &Something) {
         Something::Float(f) => {
             safe_put_f64(*f);
         }
-    }
-}
-
-#[link(wasm_import_module = "ops")]
-unsafe extern "C" {
-    // unsafe fn log_message(ptr: *const u8, len: usize);
-
-    unsafe fn js_read_string(index: usize) -> u8;
-    unsafe fn js_push_to_string(byte: u8);
-    unsafe fn js_read_string_length() -> usize;
-    unsafe fn js_pop_stack();
-    unsafe fn js_push_string_to_stack();
-    unsafe fn js_put_i32(value: i32);
-    unsafe fn js_put_f64(value: f64);
-    unsafe fn js_log_stack_value();
-    unsafe fn js_push_null();
-    unsafe fn js_create_blob(size: usize);
-    unsafe fn js_push_to_blob(byte: u8);
-    unsafe fn js_read_blob_length() -> usize;
-    unsafe fn js_read_blob_byte(index: usize) -> u8;
-}
-
-#[link(wasm_import_module = "env")]
-unsafe extern "C" {
-    #[link_name = "worker_id"]
-    fn unsafe_worker_id() -> i32;
-}
-
-fn worker_id() -> usize {
-    unsafe {
-        return unsafe_worker_id() as usize;
-    }
-}
-
-fn safe_read_string(index: usize) -> u8 {
-    unsafe {
-        let byte = js_read_string(index);
-        return byte;
-    }
-}
-
-fn safe_create_string() {
-    unsafe {
-        js_push_string_to_stack();
-    }
-}
-
-fn safe_push_to_string(byte: u8) {
-    unsafe {
-        js_push_to_string(byte);
-    }
-}
-
-fn safe_read_string_length() -> usize {
-    unsafe {
-        let len = js_read_string_length();
-        return len;
-    }
-}
-
-fn safe_put_i32(value: i32) {
-    unsafe {
-        js_put_i32(value);
-    }
-}
-
-fn safe_put_f64(value: f64) {
-    unsafe {
-        js_put_f64(value);
-    }
-}
-
-fn safe_js_pop_stack() {
-    unsafe {
-        js_pop_stack();
-    }
-}
-
-fn safe_push_null() {
-    unsafe {
-        js_push_null();
-    }
-}
-
-fn safe_log_stack_value() {
-    unsafe {
-        js_log_stack_value();
-    }
-}
-
-pub fn log_string(message: &str) {
-    safe_create_string();
-    for byte in message.as_bytes() {
-        safe_push_to_string(*byte);
-    }
-    safe_log_stack_value();
-}
-
-fn safe_create_blob(size: usize) {
-    unsafe {
-        js_create_blob(size);
-    }
-}
-
-fn safe_push_to_blob(byte: u8) {
-    unsafe {
-        js_push_to_blob(byte);
-    }
-}
-
-fn safe_read_blob_length() -> usize {
-    unsafe {
-        return js_read_blob_length();
-    }
-}
-
-fn safe_read_blob_byte(index: usize) -> u8 {
-    unsafe {
-        return js_read_blob_byte(index);
     }
 }
