@@ -110,6 +110,25 @@ export class WDB {
     this.ops = new Ops(wasmInstance);
   }
 
+  withLock<T>(fn: () => T): T {
+    try {
+      this.lock();
+      const result = fn();
+      return result;
+    } finally {
+      this.commit();
+      this.unlock();
+    }
+  }
+
+  lock() {
+    this.ops.lock();
+  }
+
+  unlock() {
+    this.ops.unlock();
+  }
+
   static async create(id: number = 0, bufferSource?: BufferSource) {
     let data: BufferSource;
     if (bufferSource) {
@@ -398,6 +417,8 @@ interface ExportsInterface {
   string_take(strIdx: number): number;
   delete_row_from_table(tableID: number): void;
   start(): void;
+  lock(): void;
+  unlock(): void;
 }
 
 class Ops {
@@ -449,6 +470,14 @@ class Ops {
   somethingPushBlobToStack(value: Uint8Array): void {
     pushBlobToStack(value);
     this.exports.something_push_blob(value.length);
+  }
+
+  lock() {
+    this.exports.lock();
+  }
+
+  unlock() {
+    this.exports.unlock();
   }
 
   somethingPushf64ToStack(value: number): void {

@@ -5,7 +5,7 @@ use std::{
 };
 
 pub struct MyRwLock<T> {
-    is_locked: AtomicBool,
+    lock: Lock,
     value: UnsafeCell<T>,
 }
 
@@ -15,31 +15,19 @@ unsafe impl<T: Send + Sync> Sync for MyRwLock<T> {}
 impl<T> MyRwLock<T> {
     pub fn new(value: T) -> Self {
         MyRwLock {
-            is_locked: AtomicBool::new(false),
+            lock: Lock::new(),
             value: UnsafeCell::new(value),
         }
     }
 
     pub fn read<'a>(&'a self) -> ReadGuard<'a, T> {
-        loop {
-            let was_locked = self.is_locked.swap(true, Ordering::Acquire);
-            if !was_locked {
-                return ReadGuard { rwlock: &self };
-            } else {
-                std::hint::spin_loop();
-            }
-        }
+        self.lock.lock();
+        return ReadGuard { rwlock: &self };
     }
 
     pub fn write<'a>(&'a self) -> WriteGuard<'a, T> {
-        loop {
-            let was_locked = self.is_locked.swap(true, Ordering::Acquire);
-            if !was_locked {
-                return WriteGuard { rwlock: &self };
-            } else {
-                std::hint::spin_loop();
-            }
-        }
+        self.lock.lock();
+        return WriteGuard { rwlock: &self };
     }
 }
 
@@ -49,7 +37,7 @@ pub struct ReadGuard<'a, T> {
 
 impl<T> Drop for ReadGuard<'_, T> {
     fn drop(&mut self) {
-        self.rwlock.is_locked.store(false, Ordering::Release);
+        self.rwlock.lock.unlock();
     }
 }
 
@@ -67,7 +55,7 @@ pub struct WriteGuard<'a, T> {
 
 impl<T> Drop for WriteGuard<'_, T> {
     fn drop(&mut self) {
-        self.rwlock.is_locked.store(false, Ordering::Release);
+        self.rwlock.lock.unlock();
     }
 }
 
@@ -82,5 +70,34 @@ impl<T> Deref for WriteGuard<'_, T> {
 impl<T> DerefMut for WriteGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.rwlock.value.get() }
+    }
+}
+
+const LOCKED: bool = true;
+const UNLOCKED: bool = false;
+
+pub struct Lock {
+    is_locked: AtomicBool,
+}
+
+impl Lock {
+    pub const fn new() -> Self {
+        Lock {
+            is_locked: AtomicBool::new(UNLOCKED),
+        }
+    }
+
+    pub fn lock(&self) {
+        while self
+            .is_locked
+            .compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            std::hint::spin_loop();
+        }
+    }
+
+    pub fn unlock(&self) {
+        self.is_locked.store(UNLOCKED, Ordering::Release);
     }
 }

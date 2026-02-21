@@ -1,6 +1,6 @@
 use crate::{
     extern_functions::*,
-    my_rwlock::MyRwLock,
+    my_rwlock::{Lock, MyRwLock},
     storage::{Database, Operation, Table},
     value::Something,
 };
@@ -17,6 +17,8 @@ fn pop_from_something_stack() -> Option<Something> {
         return db.something_stack[worker_id()].pop();
     })?;
 }
+
+static GLOBAL_LOCK: Lock = Lock::new();
 
 struct GlobalPool {
     db: MyRwLock<Database>,
@@ -52,6 +54,16 @@ impl GlobalPool {
 }
 
 static GLOBALS: LazyLock<GlobalPool> = LazyLock::new(|| GlobalPool::new());
+
+#[unsafe(no_mangle)]
+pub fn lock() {
+    GLOBAL_LOCK.lock();
+}
+
+#[unsafe(no_mangle)]
+pub fn unlock() {
+    GLOBAL_LOCK.unlock();
+}
 
 #[unsafe(no_mangle)]
 pub fn start() {

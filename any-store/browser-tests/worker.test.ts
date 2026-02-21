@@ -28,9 +28,10 @@ describe("Web Worker", async () => {
     await waitNextMessage();
 
     for (let i = 0; i < 100_000; i++) {
-      const current = row.get("counter") as number;
-      row.update("counter", WDB.i32(current + 1));
-      db.commit();
+      db.withLock(() => {
+        const current = row.get("counter") as number;
+        row.update("counter", WDB.i32(current + 1));
+      });
     }
 
     await waitNextMessage();
