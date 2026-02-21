@@ -4,8 +4,13 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+/**
+ * IMPORTANT
+ * I am ignoring the lock now because of a race condition I could not find yet
+ * Because of this race condition, I am already locking the whole wasm module before calling the funcions
+ */
 pub struct MyRwLock<T> {
-    lock: Lock,
+    // lock: Lock,
     value: UnsafeCell<T>,
 }
 
@@ -15,18 +20,13 @@ unsafe impl<T: Send + Sync> Sync for MyRwLock<T> {}
 impl<T> MyRwLock<T> {
     pub fn new(value: T) -> Self {
         MyRwLock {
-            lock: Lock::new(),
+            // lock: Lock::new(),
             value: UnsafeCell::new(value),
         }
     }
 
-    pub fn read<'a>(&'a self) -> ReadGuard<'a, T> {
-        self.lock.lock();
-        return ReadGuard { rwlock: &self };
-    }
-
     pub fn write<'a>(&'a self) -> WriteGuard<'a, T> {
-        self.lock.lock();
+        // self.lock.lock();
         return WriteGuard { rwlock: &self };
     }
 }
@@ -37,7 +37,7 @@ pub struct ReadGuard<'a, T> {
 
 impl<T> Drop for ReadGuard<'_, T> {
     fn drop(&mut self) {
-        self.rwlock.lock.unlock();
+        // self.rwlock.lock.unlock();
     }
 }
 
@@ -55,7 +55,7 @@ pub struct WriteGuard<'a, T> {
 
 impl<T> Drop for WriteGuard<'_, T> {
     fn drop(&mut self) {
-        self.rwlock.lock.unlock();
+        // self.rwlock.lock.unlock();
     }
 }
 

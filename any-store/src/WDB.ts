@@ -98,9 +98,16 @@ const ops = {
   js_read_blob_byte,
 };
 
+type WorkerData = {
+  module: WebAssembly.Module;
+  memory: WebAssembly.Memory;
+  workerID: number;
+};
+
 export class WDB {
   private ops: Ops;
   private listeners: Map<number, () => void> = new Map();
+  private workerID: number = 0;
 
   constructor(
     wasmInstance: WebAssembly.Instance,
@@ -155,12 +162,9 @@ export class WDB {
     return new WDB(instance, memory, module);
   }
 
-  static async fromModule(
-    module: WebAssembly.Module,
-    memory: WebAssembly.Memory,
-    id: number,
-  ) {
-    const worker_id = () => id;
+  static async fromModule(workerData: WorkerData) {
+    const { module, memory, workerID } = workerData;
+    const worker_id = () => workerID;
     const instance = await WebAssembly.instantiate(module, {
       env: {
         memory,
@@ -248,12 +252,13 @@ export class WDB {
     return getWholeStack();
   }
 
-  getMemory(): WebAssembly.Memory {
-    return this.memory;
-  }
-
-  getModule(): WebAssembly.Module {
-    return this.module;
+  createWorker() {
+    this.workerID += 1;
+    return {
+      memory: this.memory,
+      module: this.module,
+      workerID: this.workerID,
+    };
   }
 
   static i32(value: number): Something {

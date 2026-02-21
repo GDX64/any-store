@@ -1,7 +1,7 @@
 use crate::{
     extern_functions::*,
     my_rwlock::{Lock, MyRwLock},
-    storage::{Database, Operation, Table},
+    storage::{Database, Operation},
     value::Something,
 };
 use std::{mem, sync::LazyLock};
@@ -45,12 +45,6 @@ impl GlobalPool {
     //     let pool = self.db.read();
     //     return Some(f(&pool));
     // }
-
-    fn with_table<R, F: FnOnce(&Table) -> R>(&self, idx: usize, f: F) -> Option<R> {
-        let pool = self.db.read();
-        let value = pool.get_table(idx)?;
-        return Some(f(&value));
-    }
 }
 
 static GLOBALS: LazyLock<GlobalPool> = LazyLock::new(|| GlobalPool::new());
@@ -83,7 +77,8 @@ pub fn table_create() -> usize {
 #[unsafe(no_mangle)]
 pub fn table_get_something(table: usize, col: usize) -> Option<()> {
     let key = pop_from_something_stack()?;
-    let something = GLOBALS.with_table(table, |table: &Table| {
+    let something = GLOBALS.with_db_mut(|db| {
+        let table = db.get_table(table)?;
         return table.get(&key).and_then(|row| {
             return Some(row.get(col).clone());
         });
@@ -95,7 +90,8 @@ pub fn table_get_something(table: usize, col: usize) -> Option<()> {
 #[unsafe(no_mangle)]
 pub fn table_get_row(table: usize) -> Option<()> {
     let key = pop_from_something_stack()?;
-    let row = GLOBALS.with_table(table, |table: &Table| {
+    let row = GLOBALS.with_db_mut(|db| {
+        let table = db.get_table(table)?;
         return table.get(&key).cloned();
     })??;
     for item in row.iter() {
