@@ -4,15 +4,17 @@ import { WDB } from "../src/WDB";
 
 describe("Web Worker", async () => {
   test("counter", async () => {
+    const N = 100_000;
+    const numWorkers = 4;
     function workerWrapper() {
       const val = new Worker();
 
       function waitNextMessage() {
-        return new Promise((resolve) => {
+        return new Promise<any>((resolve) => {
           val.onmessage = resolve;
         });
       }
-      val.postMessage(db.createWorker());
+      val.postMessage({ dbData: db.createWorker(), n: N });
 
       return {
         channel: val,
@@ -31,28 +33,17 @@ describe("Web Worker", async () => {
       return row;
     });
 
-    const w1 = workerWrapper();
-    const w2 = workerWrapper();
-    // const w3 = workerWrapper();
-    // const w4 = workerWrapper();
+    const workers = Array.from({ length: numWorkers }, workerWrapper);
 
-    const allFinished = Promise.all([
-      w1.waitNextMessage(),
-      w2.waitNextMessage(),
-      // w3.waitNextMessage(),
-      // w4.waitNextMessage(),
-    ]);
+    const allFinished = await Promise.all(
+      workers.map((w) => w.waitNextMessage()),
+    );
 
-    // for (let i = 0; i < 1000_000; i++) {
-    //   db.withLock(() => {
-    //     const current = row.get("counter") as number;
-    //     row.update("counter", WDB.i32(current + 1));
-    //   });
-    // }
+    if (allFinished.some((msg) => !msg.data.ok)) {
+      throw new Error("One of the workers failed");
+    }
 
-    await allFinished;
-
-    expect(row.get("counter")).toBe(2_000_000);
+    expect(row.get("counter")).toBe(N * allFinished.length);
   });
 });
 

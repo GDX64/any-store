@@ -430,7 +430,9 @@ class Ops {
   exports: ExportsInterface;
   constructor(instance: WebAssembly.Instance) {
     this.exports = instance.exports as unknown as ExportsInterface;
+    this.exports.lock();
     this.exports.start();
+    this.exports.unlock();
   }
 
   commit() {
