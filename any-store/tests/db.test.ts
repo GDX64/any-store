@@ -37,53 +37,68 @@ describe("Database Module", () => {
     expect(row2.get("name")).toBe("Bob");
   });
 
-  const mockData = new Map<
-    number,
-    { age: number; height: number; name: string }
-  >();
-  Array.from({ length: 100 }, (_, i) => {
-    mockData.set(i, {
-      age: Math.round(Math.random() * 100),
-      height: Math.random() * 2,
-      name: `Name_${i}`,
+  test("insert and remove random data", async () => {
+    const mockData = new Map<
+      number,
+      { age: number; height: number; name: string }
+    >();
+    Array.from({ length: 100 }, (_, i) => {
+      mockData.set(i, {
+        age: Math.round(Math.random() * 100),
+        height: Math.random() * 2,
+        name: `Name_${i}`,
+      });
     });
-  });
 
-  test("insert random data", async () => {
-    const TABLES = 2;
+    const N_REPETITIONS = 2;
+    const N_TABLES = 5;
     const data = fs.readFileSync(wasmPath);
     const wdb = await AnyStore.create(0, data);
-    for (let t = 0; t < TABLES; t++) {
-      const table = wdb.createTable(
+    const tables = [...Array(N_TABLES)].map((_, i) =>
+      wdb.createTable(
         {
           name: "string",
           age: "i32",
           height: "f64",
         },
-        `table_${t}`,
-      );
+        `table_${i}`,
+      ),
+    );
 
-      mockData.forEach((item, index) => {
-        const key = AnyStore.i32(index);
-        table.insert(key, AnyStore.string(item.name), "name");
-        table.insert(key, AnyStore.i32(item.age), "age");
-        table.insert(key, AnyStore.f64(item.height), "height");
-      });
+    function insertAndRemove() {
+      for (const table of tables) {
+        mockData.forEach((item, index) => {
+          const key = AnyStore.i32(index);
+          table.insert(key, AnyStore.string(item.name), "name");
+          table.insert(key, AnyStore.i32(item.age), "age");
+          table.insert(key, AnyStore.f64(item.height), "height");
+        });
 
-      mockData.forEach((item, index) => {
-        const key = AnyStore.i32(index);
-        const row = table.row(key);
-        const rowData = row.getRow();
-        expect(rowData[0]).toBe(item.name);
-        expect(rowData[1]).toBe(item.age);
-        expect(rowData[2]).toBeCloseTo(item.height);
-        const name = row.get("name");
-        const age = row.get("age");
-        const height = row.get("height");
-        expect(name).toBe(item.name);
-        expect(age).toBe(item.age);
-        expect(height).toBeCloseTo(item.height);
-      });
+        mockData.forEach((item, index) => {
+          const key = AnyStore.i32(index);
+          const row = table.row(key);
+          const rowData = row.getRow();
+          expect(rowData[0]).toBe(item.name);
+          expect(rowData[1]).toBe(item.age);
+          expect(rowData[2]).toBeCloseTo(item.height);
+          const name = row.get("name");
+          const age = row.get("age");
+          const height = row.get("height");
+          expect(name).toBe(item.name);
+          expect(age).toBe(item.age);
+          expect(height).toBeCloseTo(item.height);
+
+          row.delete();
+
+          expect(row.get("name")).toBeNull();
+          expect(row.get("age")).toBeNull();
+          expect(row.get("height")).toBeNull();
+        });
+      }
+    }
+
+    for (let i = 0; i < N_REPETITIONS; i++) {
+      insertAndRemove();
     }
   });
 
@@ -169,5 +184,62 @@ describe("Database Module", () => {
 
     otherRow.update("counter", AnyStore.i32(20));
     expect(firstRow.get("counter")).toBe(20);
+  });
+
+  test("stress memory", async () => {
+    const mockData = new Map<
+      number,
+      { age: number; height: number; name: string }
+    >();
+    Array.from({ length: 1000 }, (_, i) => {
+      mockData.set(i, {
+        age: Math.round(Math.random() * 100),
+        height: Math.random() * 2,
+        name: `Name_${i}`,
+      });
+    });
+
+    const N_REPETITIONS = 100;
+    const N_TABLES = 10;
+    const data = fs.readFileSync(wasmPath);
+    const wdb = await AnyStore.create(0, data);
+    const tables = [...Array(N_TABLES)].map((_, i) =>
+      wdb.createTable(
+        {
+          name: "string",
+          age: "i32",
+          height: "f64",
+        },
+        `table_${i}`,
+      ),
+    );
+
+    function insertAndRemove() {
+      for (const table of tables) {
+        mockData.forEach((item, index) => {
+          const key = AnyStore.i32(index);
+          // table.insert(key, AnyStore.string(item.name), "name");
+          table.insert(key, AnyStore.i32(item.age), "age");
+          table.insert(key, AnyStore.f64(item.height), "height");
+        });
+      }
+
+      for (const table of tables) {
+        mockData.forEach((_, index) => {
+          const row = table.row(AnyStore.i32(index));
+          row.delete();
+        });
+      }
+    }
+
+    for (let i = 0; i < N_REPETITIONS / 2; i++) {
+      insertAndRemove();
+    }
+    const mem = wdb.memSize();
+    for (let i = 0; i < N_REPETITIONS / 2; i++) {
+      insertAndRemove();
+    }
+    //memory should not grow over time
+    expect(wdb.memSize()).toBe(mem);
   });
 });

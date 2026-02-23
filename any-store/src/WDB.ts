@@ -183,7 +183,8 @@ export class AnyStore {
   }
 
   memSize() {
-    return this.memory.buffer.byteLength;
+    const pageSize = 2 ** 16; // WebAssembly page size is 64KiB
+    return this.memory.buffer.byteLength / pageSize;
   }
 
   createTable<T extends ColMap>(colMap: T, name: string): Table<T> {

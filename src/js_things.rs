@@ -51,7 +51,6 @@ pub fn unlock() {
 
 #[unsafe(no_mangle)]
 pub fn start() {
-    log_string(&format!("mod start with worker_id {}", worker_id()));
     if worker_id() == 0 {
         std::panic::set_hook(Box::new(|info| {
             let msg = info.to_string();
