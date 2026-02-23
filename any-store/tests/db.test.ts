@@ -109,4 +109,34 @@ describe("Database Module", () => {
     wdb.notifyAll();
     expect(fn).toHaveBeenCalledTimes(1);
   });
+
+  test("cached row", async () => {
+    const wdb = await WDB.create(0, data);
+    const table = wdb.createTable({
+      counter: "i32",
+    });
+    const row = table.row(WDB.i32(1));
+
+    const fn = vi.fn();
+
+    row.cached(fn);
+    expect(row.get("counter")).toBeNull();
+    row.update("counter", WDB.i32(0));
+    wdb.commit();
+
+    expect(fn).toHaveBeenCalledTimes(0);
+
+    wdb.notifyAll();
+    expect(row.get("counter")).toBe(0);
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    row.update("counter", WDB.i32(1));
+    wdb.commit();
+
+    expect(row.get("counter")).toBe(0); // because we are observing row, we need to wait until it is notified
+
+    wdb.notifyAll();
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(row.get("counter")).toBe(1);
+  });
 });

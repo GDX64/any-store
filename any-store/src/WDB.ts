@@ -16,7 +16,7 @@ function getWholeStack(): any[] {
 
 function popObjectFromStack(): any {
   const val = jsStack.pop();
-  if (typeof val === "object") {
+  if (val && typeof val === "object") {
     return val.value;
   }
   return val;
@@ -351,7 +351,7 @@ export class Table<T extends ColMap> {
 }
 
 export class Row<T extends ColMap> {
-  cache: Something["value"][] | null = null;
+  private cache: Something["value"][] | null = null;
 
   constructor(
     private table: Table<T>,
@@ -359,6 +359,10 @@ export class Row<T extends ColMap> {
   ) {}
 
   get<K extends keyof T>(colName: K): Something["value"] | null {
+    if (this.cache) {
+      const col = this.table.colMap.get(colName as string);
+      return col != null ? this.cache[col] : null;
+    }
     return this.table.get(this.key, colName);
   }
 
@@ -366,9 +370,10 @@ export class Row<T extends ColMap> {
     this.cache = this.table.getRow(this.key);
   }
 
-  observe() {
-    this.addListener(() => {
+  cached(onUpdate?: () => void) {
+    return this.addListener(() => {
       this.load();
+      onUpdate?.();
     });
   }
 
@@ -389,6 +394,9 @@ export class Row<T extends ColMap> {
   }
 
   getRow(): Something["value"][] {
+    if (this.cache) {
+      return this.cache;
+    }
     return this.table.getRow(this.key);
   }
 }
