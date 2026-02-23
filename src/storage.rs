@@ -1,10 +1,33 @@
-use crate::value::Something;
-use std::{collections::HashMap, hash::Hash};
+use crate::{extern_functions::worker_id, value::Something};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
+
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Hash, PartialOrd, Ord)]
+pub struct ListenerID {
+    id: u32,
+    worker: u8,
+}
+
+impl ListenerID {
+    fn new(id: u32, worker: u8) -> Self {
+        ListenerID { id, worker }
+    }
+
+    fn is_from_worker(&self, worker_id: u8) -> bool {
+        return self.worker == worker_id;
+    }
+
+    pub fn to_i32(&self) -> i32 {
+        return self.id as i32;
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Row {
     values: Vec<Something>,
-    listeners: Option<Vec<u32>>,
+    listeners: Option<Vec<ListenerID>>,
 }
 
 impl Row {
@@ -15,7 +38,7 @@ impl Row {
         }
     }
 
-    pub fn remove_listener(&mut self, listener_id: u32) -> Option<()> {
+    pub fn remove_listener(&mut self, listener_id: ListenerID) -> Option<()> {
         if let Some(listeners) = &mut self.listeners {
             listeners.retain(|id| *id != listener_id);
             return Some(());
@@ -23,7 +46,7 @@ impl Row {
         return None;
     }
 
-    pub fn add_listener(&mut self, listener_id: u32) {
+    pub fn add_listener(&mut self, listener_id: ListenerID) {
         if let Some(listeners) = &mut self.listeners {
             listeners.push(listener_id);
         } else {
@@ -31,7 +54,7 @@ impl Row {
         }
     }
 
-    pub fn notify(&self, arr: &mut Vec<u32>) {
+    pub fn notify(&self, arr: &mut Vec<ListenerID>) {
         if let Some(listeners) = &self.listeners {
             arr.extend_from_slice(listeners);
         }
@@ -89,15 +112,17 @@ impl Database {
         }
     }
 
-    pub fn take_notifications(&mut self) -> Vec<u32> {
-        let notifications = self
+    pub fn take_notifications(&mut self, worker_id: u8) -> Vec<i32> {
+        let notifications: HashSet<i32> = self
             .tables
             .values_mut()
             .flat_map(|table| {
-                return table.take_notifications().into_iter();
+                return table.take_notifications(worker_id).into_iter();
             })
+            .map(|id| id.to_i32())
             .collect();
-        return notifications;
+
+        return notifications.into_iter().collect();
     }
 
     pub fn remove_listener(
@@ -106,15 +131,16 @@ impl Database {
         key: &Something,
         listener_id: u32,
     ) -> Option<()> {
+        let listener_id = ListenerID::new(listener_id, worker_id() as u8);
         self.tables
             .get_mut(&table_id)?
             .remove_listener(key, listener_id);
         return Some(());
     }
 
-    pub fn add_listener_to(&mut self, table_id: usize, key: &Something) -> Option<u32> {
+    pub fn add_listener_to(&mut self, table_id: usize, key: &Something) -> Option<ListenerID> {
         let table = self.tables.get_mut(&table_id)?;
-        let listener_id = self.next_listener_id;
+        let listener_id = ListenerID::new(self.next_listener_id, worker_id() as u8);
         self.next_listener_id += 1;
         table.add_listener(listener_id, key)?;
         return Some(listener_id);
@@ -141,7 +167,7 @@ impl Database {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Table {
     items: HashMap<Something, Row>,
-    notifications: Vec<u32>,
+    notifications: Vec<ListenerID>,
 }
 
 impl Table {
@@ -152,16 +178,24 @@ impl Table {
         }
     }
 
-    pub fn remove_listener(&mut self, key: &Something, listener_id: u32) -> Option<()> {
+    pub fn remove_listener(&mut self, key: &Something, listener_id: ListenerID) -> Option<()> {
         self.items.get_mut(key)?.remove_listener(listener_id);
         return Some(());
     }
 
-    pub fn take_notifications(&mut self) -> Vec<u32> {
-        std::mem::take(&mut self.notifications)
+    fn take_notifications(&mut self, worker_id: u8) -> Vec<ListenerID> {
+        let mut v = Vec::new();
+        self.notifications.retain(|l| {
+            if l.is_from_worker(worker_id) {
+                v.push(*l);
+                return false;
+            }
+            return true;
+        });
+        return v;
     }
 
-    pub fn add_listener(&mut self, listener_id: u32, key: &Something) -> Option<()> {
+    pub fn add_listener(&mut self, listener_id: ListenerID, key: &Something) -> Option<()> {
         let row = self.items.entry(key.clone()).or_insert_with(Row::new);
         row.add_listener(listener_id);
         return Some(());

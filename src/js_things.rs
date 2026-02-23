@@ -1,7 +1,7 @@
 use crate::{
     extern_functions::*,
     my_rwlock::{Lock, MyRwLock},
-    storage::{Database, Operation},
+    storage::{Database, ListenerID, Operation},
     value::Something,
 };
 use std::{mem, sync::LazyLock};
@@ -210,11 +210,11 @@ pub fn table_remove_listener(table_id: usize, listener_id: u32) -> Option<()> {
 #[unsafe(no_mangle)]
 pub fn db_take_notifications() -> Option<()> {
     let notifications = GLOBALS.with_db_mut(|db| {
-        return db.take_notifications();
+        return db.take_notifications(worker_id() as u8);
     })?;
 
     for notification in notifications {
-        safe_put_i32(notification as i32);
+        safe_put_i32(notification);
     }
 
     return Some(());
@@ -222,14 +222,14 @@ pub fn db_take_notifications() -> Option<()> {
 
 #[unsafe(no_mangle)]
 pub fn table_add_listener_to_row(table_id: usize) -> i32 {
-    fn inner(table_id: usize) -> Option<u32> {
+    fn inner(table_id: usize) -> Option<ListenerID> {
         let something = pop_from_something_stack()?;
         let id = GLOBALS.with_db_mut(|db| {
             return db.add_listener_to(table_id, &something);
         })?;
         return id;
     }
-    return inner(table_id).map(|id| id as i32).unwrap_or(-1);
+    return inner(table_id).map(|id| id.to_i32()).unwrap_or(-1);
 }
 
 #[unsafe(no_mangle)]

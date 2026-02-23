@@ -128,11 +128,11 @@ export class WDB {
     }
   }
 
-  lock() {
+  private lock() {
     this.ops.lock();
   }
 
-  unlock() {
+  private unlock() {
     this.ops.unlock();
   }
 
@@ -218,10 +218,12 @@ export class WDB {
   }
 
   notifyAll() {
-    const arr = this.ops.takeNotifications();
-    arr.forEach((id) => {
-      const listener = this.listeners.get(id);
-      listener?.();
+    this.withLock(() => {
+      const arr = this.ops.takeNotifications();
+      arr.forEach((id) => {
+        const listener = this.listeners.get(id);
+        listener?.();
+      });
     });
   }
 
@@ -349,6 +351,8 @@ export class Table<T extends ColMap> {
 }
 
 export class Row<T extends ColMap> {
+  cache: Something["value"][] | null = null;
+
   constructor(
     private table: Table<T>,
     private key: Something,
@@ -356,6 +360,16 @@ export class Row<T extends ColMap> {
 
   get<K extends keyof T>(colName: K): Something["value"] | null {
     return this.table.get(this.key, colName);
+  }
+
+  private load() {
+    this.cache = this.table.getRow(this.key);
+  }
+
+  observe() {
+    this.addListener(() => {
+      this.load();
+    });
   }
 
   addListener(fn: () => void) {
