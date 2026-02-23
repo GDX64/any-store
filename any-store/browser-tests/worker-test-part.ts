@@ -6,7 +6,7 @@ self.onmessage = async (event) => {
   const row = db.withLock(() => {
     const id = db.tableIDFromName("hello");
     if (!id) {
-      console.error("Table 'hello' not found");
+      throw new Error("Table 'hello' not found");
     }
     console.log("Got table ID:", id);
     const table = db.getTable(id, { counter: "i32" });
