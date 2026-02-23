@@ -28,7 +28,6 @@ describe("benchmarks inserts", async () => {
           const key = WDB.i32(index);
           table.insertRow(key, [item.name, item.age, item.height]);
         });
-        db.commit();
       } catch (e) {
         console.error(e);
       }
@@ -105,7 +104,6 @@ describe("benchmarks selects", async () => {
     table.insert(key, item.age, "age");
     table.insert(key, item.height, "height");
   });
-  db.commit();
 
   const sqliteDB = new DatabaseSync(":memory:");
   sqliteDB.exec(`pragma journal_mode = WAL;`);

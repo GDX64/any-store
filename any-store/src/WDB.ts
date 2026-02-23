@@ -123,7 +123,6 @@ export class WDB {
       const result = fn();
       return result;
     } finally {
-      this.commit();
       this.unlock();
     }
   }
@@ -173,10 +172,6 @@ export class WDB {
       ops,
     });
     return new WDB(instance, memory, module);
-  }
-
-  commit() {
-    return this.ops.commit();
   }
 
   getTable<T extends ColMap>(tableID: number, colMap: T): Table<T> {
@@ -438,7 +433,6 @@ interface ExportsInterface {
   table_get_row(tableID: number): void;
   table_add_listener_to_row(tableID: number): number;
   table_remove_listener(tableID: number, listenerID: number): void;
-  commit_ops(): void;
   table_get_something(tableID: number, col: number): void;
   table_insert_row(tableID: number): void;
   string_take(strIdx: number): number;
@@ -455,10 +449,6 @@ class Ops {
     this.exports.lock();
     this.exports.start();
     this.exports.unlock();
-  }
-
-  commit() {
-    return this.exports.commit_ops();
   }
 
   createTable() {

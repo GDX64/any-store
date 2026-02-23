@@ -20,7 +20,6 @@ describe("Database Module", () => {
     table.insert(k1, WDB.f64(1.75), "height");
     table.insert(k1, WDB.blob(new Uint8Array([1, 2, 3]))!, "data");
     table.insert(WDB.i32(0), WDB.string("Bob"), "name");
-    wdb.commit();
 
     const row1 = table.row(k1);
     expect(row1.get("name")).toBe("Alice");
@@ -28,7 +27,6 @@ describe("Database Module", () => {
     expect(row1.get("height")).toBeCloseTo(1.75);
     expect(row1.get("data")).toEqual(new Uint8Array([1, 2, 3]));
     row1.delete();
-    wdb.commit();
 
     expect(row1.get("name")).toBeNull();
 
@@ -65,7 +63,6 @@ describe("Database Module", () => {
         table.insert(key, WDB.i32(item.age), "age");
         table.insert(key, WDB.f64(item.height), "height");
       });
-      wdb.commit();
 
       mockData.forEach((item, index) => {
         const key = WDB.i32(index);
@@ -96,7 +93,6 @@ describe("Database Module", () => {
     expect(fn).toHaveBeenCalledTimes(0);
 
     row.update("counter", WDB.i32(0));
-    wdb.commit();
 
     wdb.notifyAll();
     expect(fn).toHaveBeenCalledTimes(1);
@@ -104,7 +100,6 @@ describe("Database Module", () => {
     row.removeListener(listenerID);
 
     row.update("counter", WDB.i32(1));
-    wdb.commit();
 
     wdb.notifyAll();
     expect(fn).toHaveBeenCalledTimes(1);
@@ -122,7 +117,6 @@ describe("Database Module", () => {
     row.cached(fn);
     expect(row.get("counter")).toBeNull();
     row.update("counter", WDB.i32(0));
-    wdb.commit();
 
     expect(fn).toHaveBeenCalledTimes(0);
 
@@ -131,7 +125,6 @@ describe("Database Module", () => {
     expect(fn).toHaveBeenCalledTimes(1);
 
     row.update("counter", WDB.i32(1));
-    wdb.commit();
 
     expect(row.get("counter")).toBe(0); // because we are observing row, we need to wait until it is notified
 

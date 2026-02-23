@@ -40,11 +40,6 @@ impl GlobalPool {
         let mut pool = self.db.write();
         return Some(f(&mut pool));
     }
-
-    // fn with_db<R, F: FnOnce(&Database) -> R>(&self, f: F) -> Option<R> {
-    //     let pool = self.db.read();
-    //     return Some(f(&pool));
-    // }
 }
 
 static GLOBALS: LazyLock<GlobalPool> = LazyLock::new(|| GlobalPool::new());
@@ -107,7 +102,7 @@ pub fn table_insert(table: usize, col: usize) -> Option<()> {
     let value = pop_from_something_stack()?;
     let key = pop_from_something_stack()?;
     GLOBALS.with_db_mut(|db| {
-        db.operation_stack[worker_id()].push(Operation::Insert {
+        db.operation(Operation::Insert {
             table_id: table,
             key,
             value,
@@ -118,41 +113,10 @@ pub fn table_insert(table: usize, col: usize) -> Option<()> {
 }
 
 #[unsafe(no_mangle)]
-pub fn commit_ops() {
-    GLOBALS.with_db_mut(|db| {
-        let ops = mem::take(&mut db.operation_stack[worker_id()]);
-        for op in ops {
-            match op {
-                Operation::InsertRow { table_id, data } => {
-                    db.get_table_mut(table_id).and_then(|table| {
-                        return table.insert_row(data);
-                    });
-                }
-                Operation::Insert {
-                    table_id,
-                    key,
-                    value,
-                    index,
-                } => {
-                    db.get_table_mut(table_id).map(|table| {
-                        return table.insert_at(key, value, index);
-                    });
-                }
-                Operation::RowDelete { table_id, key } => {
-                    db.get_table_mut(table_id).map(|table| {
-                        table.delete_row(&key);
-                    });
-                }
-            }
-        }
-    });
-}
-
-#[unsafe(no_mangle)]
 pub fn table_insert_row(table: usize) -> Option<()> {
     GLOBALS.with_db_mut(|db| {
         let v = { mem::take(&mut db.something_stack[worker_id()]) };
-        db.operation_stack[worker_id()].push(Operation::InsertRow {
+        db.operation(Operation::InsertRow {
             table_id: table,
             data: v,
         });
@@ -190,7 +154,7 @@ pub fn something_push_f64_to_stack(value: f64) {
 pub fn delete_row_from_table(table_id: usize) -> Option<()> {
     let something = pop_from_something_stack()?;
     GLOBALS.with_db_mut(|db| {
-        db.operation_stack[worker_id()].push(Operation::RowDelete {
+        db.operation(Operation::RowDelete {
             table_id,
             key: something,
         });

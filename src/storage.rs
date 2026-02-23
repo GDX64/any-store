@@ -81,7 +81,6 @@ pub struct Database {
     tables: HashMap<usize, Table>,
     next_listener_id: u32,
     pub something_stack: [Vec<Something>; 16],
-    pub operation_stack: [Vec<Operation>; 16],
 }
 
 pub enum Operation {
@@ -108,7 +107,6 @@ impl Database {
             tables: HashMap::default(),
             next_listener_id: 0,
             something_stack: Default::default(),
-            operation_stack: Default::default(),
         }
     }
 
@@ -123,6 +121,31 @@ impl Database {
             .collect();
 
         return notifications.into_iter().collect();
+    }
+
+    pub fn operation(&mut self, op: Operation) {
+        match op {
+            Operation::InsertRow { table_id, data } => {
+                self.get_table_mut(table_id).and_then(|table| {
+                    return table.insert_row(data);
+                });
+            }
+            Operation::Insert {
+                table_id,
+                key,
+                value,
+                index,
+            } => {
+                self.get_table_mut(table_id).map(|table| {
+                    return table.insert_at(key, value, index);
+                });
+            }
+            Operation::RowDelete { table_id, key } => {
+                self.get_table_mut(table_id).map(|table| {
+                    table.delete_row(&key);
+                });
+            }
+        }
     }
 
     pub fn remove_listener(
