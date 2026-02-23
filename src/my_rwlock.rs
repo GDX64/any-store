@@ -1,8 +1,11 @@
 use std::{
+    arch::wasm32,
     cell::UnsafeCell,
     ops::{Deref, DerefMut},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicI32, Ordering},
 };
+
+use crate::extern_functions;
 
 /**
  * IMPORTANT
@@ -73,17 +76,17 @@ impl<T> DerefMut for WriteGuard<'_, T> {
     }
 }
 
-const LOCKED: bool = true;
-const UNLOCKED: bool = false;
+const LOCKED: i32 = 1;
+const UNLOCKED: i32 = 0;
 
 pub struct Lock {
-    is_locked: AtomicBool,
+    is_locked: AtomicI32,
 }
 
 impl Lock {
     pub const fn new() -> Self {
         Lock {
-            is_locked: AtomicBool::new(UNLOCKED),
+            is_locked: AtomicI32::new(UNLOCKED),
         }
     }
 
@@ -93,11 +96,22 @@ impl Lock {
             .compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed)
             .is_err()
         {
-            std::hint::spin_loop();
+            if extern_functions::is_main_thread() {
+                continue;
+            }
+            #[cfg(target_arch = "wasm32")]
+            unsafe {
+                let ptr = self.is_locked.as_ptr();
+                wasm32::memory_atomic_wait32(ptr, 1, 1000_000);
+            }
         }
     }
 
     pub fn unlock(&self) {
         self.is_locked.store(UNLOCKED, Ordering::Release);
+        #[cfg(target_arch = "wasm32")]
+        unsafe {
+            wasm32::memory_atomic_notify(self.is_locked.as_ptr(), 1);
+        }
     }
 }

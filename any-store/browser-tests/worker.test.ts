@@ -35,6 +35,13 @@ describe("Web Worker", async () => {
 
     const workers = Array.from({ length: numWorkers }, workerWrapper);
 
+    for (let i = 0; i < N; i++) {
+      db.withLock(() => {
+        const current = row.get("counter") as number;
+        row.update("counter", WDB.i32(current + 1));
+      });
+    }
+
     const allFinished = await Promise.all(
       workers.map((w) => w.waitNextMessage()),
     );
@@ -43,7 +50,7 @@ describe("Web Worker", async () => {
       throw new Error("One of the workers failed");
     }
 
-    expect(row.get("counter")).toBe(N * allFinished.length);
+    expect(row.get("counter")).toBe(N * (allFinished.length + 1));
   });
 });
 

@@ -38,6 +38,10 @@ mod extern_functions_mod {
         fn unsafe_worker_id() -> i32;
     }
 
+    pub fn is_main_thread() -> bool {
+        worker_id() == 0
+    }
+
     pub fn worker_id() -> usize {
         unsafe {
             return unsafe_worker_id() as usize;
@@ -227,6 +231,10 @@ mod extern_functions_mod {
 
     pub fn log_string(s: &str) {
         MOCK_LOGS.with(|logs| logs.borrow_mut().push(s.to_string()));
+    }
+
+    pub fn is_main_thread() -> bool {
+        worker_id() == 0
     }
 
     // Helper functions for tests
