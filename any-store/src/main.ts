@@ -1,14 +1,16 @@
-import { WDB } from "@glmachado/any-store";
+import { AnyStore } from "@glmachado/any-store";
 
-const db = await WDB.create();
-const table = db.createTable({
-  counter: "i32",
-});
-const row = table.row(WDB.i32(1));
+const db = await AnyStore.create();
+const table = db.createTable(
+  {
+    counter: "i32",
+  },
+  "hello",
+);
+const row = table.row(AnyStore.i32(1));
 
 console.log(row.get("counter")); // null
 
-row.update("counter", WDB.i32(0));
-db.commit();
+row.update("counter", AnyStore.i32(0));
 
 console.log(row.get("counter")); // 0
