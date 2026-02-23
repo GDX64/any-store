@@ -1,7 +1,7 @@
 {
   "name": "@glmachado/any-store",
   "private": false,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "files": [
     "dist"
@@ -22,8 +22,8 @@
     "test": "vitest",
     "bench": "vitest bench",
     "test:browser": "vitest --config=vitest.browser.config.ts",
-    "test-ci": "cargo wasm && vitest --run & vitest --config=vitest.browser.config.ts --run & cargo test",
-    "publish": "npm run build && npm run test-ci && npm publish --access public"
+    "test-ci": "cargo wasm && vitest --run & vitest --config=vitest.browser.config.ts --run --browser.headless & cargo test",
+    "deploy": "npm run build && npm run test-ci && npm publish --access public"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",
