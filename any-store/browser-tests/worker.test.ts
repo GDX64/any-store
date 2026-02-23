@@ -5,7 +5,7 @@ import { WDB } from "../src/WDB";
 describe("Web Worker", async () => {
   test("counter", async () => {
     const N = 100_000;
-    const numWorkers = 4;
+    const numWorkers = navigator.hardwareConcurrency - 1;
     function workerWrapper() {
       const val = new Worker();
 
