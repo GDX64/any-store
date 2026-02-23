@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import Worker from "./worker-test-part?worker";
-import { WDB } from "../src/WDB";
+import { AnyStore } from "../src/WDB";
 
 describe("Web Worker", async () => {
   test("counter", async () => {
@@ -22,7 +22,7 @@ describe("Web Worker", async () => {
       };
     }
 
-    const db = await WDB.create(0);
+    const db = await AnyStore.create(0);
     const row = db.withLock(() => {
       const table = db.createTable(
         {
@@ -31,8 +31,8 @@ describe("Web Worker", async () => {
         "hello",
       );
 
-      const row = table.row(WDB.i32(1));
-      row.update("counter", WDB.i32(0));
+      const row = table.row(AnyStore.i32(1));
+      row.update("counter", AnyStore.i32(0));
       return row;
     });
 
@@ -41,7 +41,7 @@ describe("Web Worker", async () => {
     for (let i = 0; i < N; i++) {
       db.withLock(() => {
         const current = row.get("counter") as number;
-        row.update("counter", WDB.i32(current + 1));
+        row.update("counter", AnyStore.i32(current + 1));
       });
     }
 

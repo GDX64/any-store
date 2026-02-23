@@ -1,5 +1,5 @@
 import fs from "fs";
-import { WDB } from "../src/WDB";
+import { AnyStore } from "../src/WDB";
 import { describe, expect, test, vi } from "vitest";
 const wasmPath = "../target/wasm32-unknown-unknown/release/any_store.wasm";
 
@@ -7,7 +7,7 @@ const data = fs.readFileSync(wasmPath);
 
 describe("Database Module", () => {
   test("should initialize the database correctly", async () => {
-    const wdb = await WDB.create(0, data);
+    const wdb = await AnyStore.create(0, data);
     const table = wdb.createTable(
       {
         name: "string",
@@ -17,12 +17,12 @@ describe("Database Module", () => {
       },
       "test_table",
     );
-    const k1 = WDB.i32(123);
-    table.insert(k1, WDB.string("Alice"), "name");
-    table.insert(k1, WDB.i32(30), "age");
-    table.insert(k1, WDB.f64(1.75), "height");
-    table.insert(k1, WDB.blob(new Uint8Array([1, 2, 3]))!, "data");
-    table.insert(WDB.i32(0), WDB.string("Bob"), "name");
+    const k1 = AnyStore.i32(123);
+    table.insert(k1, AnyStore.string("Alice"), "name");
+    table.insert(k1, AnyStore.i32(30), "age");
+    table.insert(k1, AnyStore.f64(1.75), "height");
+    table.insert(k1, AnyStore.blob(new Uint8Array([1, 2, 3]))!, "data");
+    table.insert(AnyStore.i32(0), AnyStore.string("Bob"), "name");
 
     const row1 = table.row(k1);
     expect(row1.get("name")).toBe("Alice");
@@ -33,7 +33,7 @@ describe("Database Module", () => {
 
     expect(row1.get("name")).toBeNull();
 
-    const row2 = table.row(WDB.i32(0));
+    const row2 = table.row(AnyStore.i32(0));
     expect(row2.get("name")).toBe("Bob");
   });
 
@@ -52,7 +52,7 @@ describe("Database Module", () => {
   test("insert random data", async () => {
     const TABLES = 2;
     const data = fs.readFileSync(wasmPath);
-    const wdb = await WDB.create(0, data);
+    const wdb = await AnyStore.create(0, data);
     for (let t = 0; t < TABLES; t++) {
       const table = wdb.createTable(
         {
@@ -64,14 +64,14 @@ describe("Database Module", () => {
       );
 
       mockData.forEach((item, index) => {
-        const key = WDB.i32(index);
-        table.insert(key, WDB.string(item.name), "name");
-        table.insert(key, WDB.i32(item.age), "age");
-        table.insert(key, WDB.f64(item.height), "height");
+        const key = AnyStore.i32(index);
+        table.insert(key, AnyStore.string(item.name), "name");
+        table.insert(key, AnyStore.i32(item.age), "age");
+        table.insert(key, AnyStore.f64(item.height), "height");
       });
 
       mockData.forEach((item, index) => {
-        const key = WDB.i32(index);
+        const key = AnyStore.i32(index);
         const row = table.row(key);
         const rowData = row.getRow();
         expect(rowData[0]).toBe(item.name);
@@ -88,47 +88,48 @@ describe("Database Module", () => {
   });
 
   test("add listener to row", async () => {
-    const wdb = await WDB.create(0, data);
+    const wdb = await AnyStore.create(0, data);
     const table = wdb.createTable(
       {
         counter: "i32",
       },
       "test_table",
     );
-    const row = table.row(WDB.i32(1));
+    const row = table.row(AnyStore.i32(1));
     const fn = vi.fn();
     const listenerID = row.addListener(fn);
     wdb.notifyAll();
     expect(fn).toHaveBeenCalledTimes(0);
 
-    row.update("counter", WDB.i32(0));
+    row.update("counter", AnyStore.i32(0));
 
     wdb.notifyAll();
+    wdb.notifyAll(); //even if we notify multiple times, the listener should be called only once
     expect(fn).toHaveBeenCalledTimes(1);
 
     row.removeListener(listenerID);
 
-    row.update("counter", WDB.i32(1));
+    row.update("counter", AnyStore.i32(1));
 
     wdb.notifyAll();
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
   test("cached row", async () => {
-    const wdb = await WDB.create(0, data);
+    const wdb = await AnyStore.create(0, data);
     const table = wdb.createTable(
       {
         counter: "i32",
       },
       "test_table",
     );
-    const row = table.row(WDB.i32(1));
+    const row = table.row(AnyStore.i32(1));
 
     const fn = vi.fn();
 
     row.cached(fn);
     expect(row.get("counter")).toBeNull();
-    row.update("counter", WDB.i32(0));
+    row.update("counter", AnyStore.i32(0));
 
     expect(fn).toHaveBeenCalledTimes(0);
 
@@ -136,12 +137,37 @@ describe("Database Module", () => {
     expect(row.get("counter")).toBe(0);
     expect(fn).toHaveBeenCalledTimes(1);
 
-    row.update("counter", WDB.i32(1));
+    row.update("counter", AnyStore.i32(1));
 
     expect(row.get("counter")).toBe(0); // because we are observing row, we need to wait until it is notified
 
     wdb.notifyAll();
     expect(fn).toHaveBeenCalledTimes(2);
     expect(row.get("counter")).toBe(1);
+  });
+
+  test("worker modules in the same thread", async () => {
+    const wdb = await AnyStore.create(0, data);
+
+    wdb.createTable({ counter: "i32" }, "table1"); //not used
+    wdb.createTable({ counter: "i32" }, "table2"); //not used
+
+    const table = wdb.createTable({ counter: "i32" }, "hello");
+    const firstRow = table.row(AnyStore.i32(1));
+    firstRow.update("counter", AnyStore.i32(10));
+
+    const module = wdb.createWorker();
+    const other = await AnyStore.fromModule(module);
+
+    const otherTable = other.getTable("hello", { counter: "i32" });
+    if (!otherTable) {
+      throw new Error("Table 'hello' not found in other module");
+    }
+
+    const otherRow = otherTable.row(AnyStore.i32(1));
+    expect(otherRow.get("counter")).toBe(10);
+
+    otherRow.update("counter", AnyStore.i32(20));
+    expect(firstRow.get("counter")).toBe(20);
   });
 });

@@ -1,5 +1,5 @@
 import { bench, describe } from "vitest";
-import { WDB } from "../src/WDB";
+import { AnyStore } from "../src/WDB";
 import { DatabaseSync } from "node:sqlite";
 import fs from "fs";
 const wasmPath = "../target/wasm32-unknown-unknown/release/any_store.wasm";
@@ -8,12 +8,12 @@ const data = fs.readFileSync(wasmPath);
 describe("benchmarks inserts", async () => {
   const mockData = Array.from({ length: 100 }, (_, i) => {
     return {
-      age: WDB.i32(Math.round(Math.random() * 100)),
-      height: WDB.f64(Math.random() * 2),
-      name: WDB.string("PETR4" + i),
+      age: AnyStore.i32(Math.round(Math.random() * 100)),
+      height: AnyStore.f64(Math.random() * 2),
+      name: AnyStore.string("PETR4" + i),
     };
   });
-  const db = await WDB.create(0, data);
+  const db = await AnyStore.create(0, data);
 
   bench(
     "insert on db",
@@ -28,7 +28,7 @@ describe("benchmarks inserts", async () => {
           "hello",
         );
         mockData.forEach((item, index) => {
-          const key = WDB.i32(index);
+          const key = AnyStore.i32(index);
           table.insertRow(key, [item.name, item.age, item.height]);
         });
       } catch (e) {
@@ -90,12 +90,12 @@ describe("benchmarks inserts", async () => {
 describe("benchmarks selects", async () => {
   const mockData = Array.from({ length: 10_000 }, (_, i) => {
     return {
-      age: WDB.i32(Math.round(Math.random() * 100)),
-      height: WDB.f64(Math.random() * 2),
-      name: WDB.string("PETR4" + i),
+      age: AnyStore.i32(Math.round(Math.random() * 100)),
+      height: AnyStore.f64(Math.random() * 2),
+      name: AnyStore.string("PETR4" + i),
     };
   });
-  const db = await WDB.create(0, data);
+  const db = await AnyStore.create(0, data);
   const table = db.createTable(
     {
       name: "string",
@@ -105,7 +105,7 @@ describe("benchmarks selects", async () => {
     "hello",
   );
   mockData.forEach((item, index) => {
-    const key = WDB.i32(index);
+    const key = AnyStore.i32(index);
     table.insert(key, item.name, "name");
     table.insert(key, item.age, "age");
     table.insert(key, item.height, "height");
@@ -138,7 +138,7 @@ describe("benchmarks selects", async () => {
     const N = 1000;
     const results: any = [];
     for (let i = 0; i < N; i++) {
-      const key = WDB.i32(Math.floor(Math.random() * 10_000));
+      const key = AnyStore.i32(Math.floor(Math.random() * 10_000));
       const row = table.row(key);
       const rowData = row.getRow();
       results.push(rowData);

@@ -104,7 +104,7 @@ type WorkerData = {
   workerID: number;
 };
 
-export class WDB {
+export class AnyStore {
   private ops: Ops;
   private listeners: Map<number, () => void> = new Map();
   private workerID: number = 0;
@@ -158,7 +158,7 @@ export class WDB {
     };
     const res = await WebAssembly.instantiate(data, importObj);
     const { instance, module } = res;
-    return new WDB(instance, memory, module);
+    return new AnyStore(instance, memory, module);
   }
 
   static async fromModule(workerData: WorkerData) {
@@ -171,15 +171,15 @@ export class WDB {
       },
       ops,
     });
-    return new WDB(instance, memory, module);
+    return new AnyStore(instance, memory, module);
   }
 
-  tableIDFromName(name: string): number | null {
-    return this.ops.getTableIDFromName(name);
-  }
-
-  getTable<T extends ColMap>(tableID: number, colMap: T): Table<T> {
-    return new Table<T>(colMap, tableID, this);
+  getTable<T extends ColMap>(name: string, colMap: T): Table<T> | null {
+    const id = this.ops.getTableIDFromName(name);
+    if (!id) {
+      return null;
+    }
+    return new Table<T>(colMap, id, this);
   }
 
   memSize() {
@@ -288,13 +288,13 @@ export class WDB {
 
   static somethingFromValue(value: any): Something | null {
     if (typeof value === "number") {
-      return WDB.f64(value);
+      return AnyStore.f64(value);
     } else if (typeof value === "string") {
-      return WDB.string(value);
+      return AnyStore.string(value);
     } else if (value === null) {
       return { tag: "null", value: null };
     } else if (value instanceof Uint8Array) {
-      return WDB.blob(value);
+      return AnyStore.blob(value);
     }
     return null;
   }
@@ -307,7 +307,7 @@ export class Table<T extends ColMap> {
   constructor(
     colMap: T,
     private id: number,
-    private wdb: WDB,
+    private wdb: AnyStore,
   ) {
     Object.keys(colMap).forEach((colName, index) => {
       this.colMap.set(colName, index);
