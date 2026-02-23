@@ -24,12 +24,9 @@ describe("Web Worker", async () => {
 
     const db = await AnyStore.create(0);
     const row = db.withLock(() => {
-      const table = db.createTable(
-        {
-          counter: "i32",
-        },
-        "hello",
-      );
+      const table = db.createTable("hello", {
+        counter: "i32",
+      });
 
       const row = table.row(AnyStore.i32(1));
       row.update("counter", AnyStore.i32(0));

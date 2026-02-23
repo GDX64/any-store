@@ -187,7 +187,7 @@ export class AnyStore {
     return this.memory.buffer.byteLength / pageSize;
   }
 
-  createTable<T extends ColMap>(colMap: T, name: string): Table<T> {
+  createTable<T extends ColMap>(name: string, colMap: T): Table<T> {
     const id = this.ops.createTable(name);
     return new Table<T>(colMap, id, this);
   }

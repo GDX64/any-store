@@ -19,14 +19,11 @@ describe("benchmarks inserts", async () => {
     "insert on db",
     async () => {
       try {
-        const table = db.createTable(
-          {
-            name: "string",
-            age: "i32",
-            height: "f64",
-          },
-          "hello",
-        );
+        const table = db.createTable("hello", {
+          name: "string",
+          age: "i32",
+          height: "f64",
+        });
         mockData.forEach((item, index) => {
           const key = AnyStore.i32(index);
           table.insertRow(key, [item.name, item.age, item.height]);
@@ -96,14 +93,11 @@ describe("benchmarks selects", async () => {
     };
   });
   const db = await AnyStore.create(0, data);
-  const table = db.createTable(
-    {
-      name: "string",
-      age: "i32",
-      height: "f64",
-    },
-    "hello",
-  );
+  const table = db.createTable("hello", {
+    name: "string",
+    age: "i32",
+    height: "f64",
+  });
   mockData.forEach((item, index) => {
     const key = AnyStore.i32(index);
     table.insert(key, item.name, "name");

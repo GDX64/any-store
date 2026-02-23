@@ -8,15 +8,12 @@ const data = fs.readFileSync(wasmPath);
 describe("Database Module", () => {
   test("should initialize the database correctly", async () => {
     const wdb = await AnyStore.create(0, data);
-    const table = wdb.createTable(
-      {
-        name: "string",
-        age: "i32",
-        height: "f64",
-        data: "blob",
-      },
-      "test_table",
-    );
+    const table = wdb.createTable("test_table", {
+      name: "string",
+      age: "i32",
+      height: "f64",
+      data: "blob",
+    });
     const k1 = AnyStore.i32(123);
     table.insert(k1, AnyStore.string("Alice"), "name");
     table.insert(k1, AnyStore.i32(30), "age");
@@ -55,14 +52,11 @@ describe("Database Module", () => {
     const data = fs.readFileSync(wasmPath);
     const wdb = await AnyStore.create(0, data);
     const tables = [...Array(N_TABLES)].map((_, i) =>
-      wdb.createTable(
-        {
-          name: "string",
-          age: "i32",
-          height: "f64",
-        },
-        `table_${i}`,
-      ),
+      wdb.createTable(`table_${i}`, {
+        name: "string",
+        age: "i32",
+        height: "f64",
+      }),
     );
 
     function insertAndRemove() {
@@ -104,12 +98,9 @@ describe("Database Module", () => {
 
   test("add listener to row", async () => {
     const wdb = await AnyStore.create(0, data);
-    const table = wdb.createTable(
-      {
-        counter: "i32",
-      },
-      "test_table",
-    );
+    const table = wdb.createTable("test_table", {
+      counter: "i32",
+    });
     const row = table.row(AnyStore.i32(1));
     const fn = vi.fn();
     const listenerID = row.addListener(fn);
@@ -132,12 +123,9 @@ describe("Database Module", () => {
 
   test("cached row", async () => {
     const wdb = await AnyStore.create(0, data);
-    const table = wdb.createTable(
-      {
-        counter: "i32",
-      },
-      "test_table",
-    );
+    const table = wdb.createTable("test_table", {
+      counter: "i32",
+    });
     const row = table.row(AnyStore.i32(1));
 
     const fn = vi.fn();
@@ -164,10 +152,10 @@ describe("Database Module", () => {
   test("worker modules in the same thread", async () => {
     const wdb = await AnyStore.create(0, data);
 
-    wdb.createTable({ counter: "i32" }, "table1"); //not used
-    wdb.createTable({ counter: "i32" }, "table2"); //not used
+    wdb.createTable("table1", { counter: "i32" }); //not used
+    wdb.createTable("table2", { counter: "i32" }); //not used
 
-    const table = wdb.createTable({ counter: "i32" }, "hello");
+    const table = wdb.createTable("hello", { counter: "i32" });
     const firstRow = table.row(AnyStore.i32(1));
     firstRow.update("counter", AnyStore.i32(10));
 
@@ -204,14 +192,11 @@ describe("Database Module", () => {
     const data = fs.readFileSync(wasmPath);
     const wdb = await AnyStore.create(0, data);
     const tables = [...Array(N_TABLES)].map((_, i) =>
-      wdb.createTable(
-        {
-          name: "string",
-          age: "i32",
-          height: "f64",
-        },
-        `table_${i}`,
-      ),
+      wdb.createTable(`table_${i}`, {
+        name: "string",
+        age: "i32",
+        height: "f64",
+      }),
     );
 
     function insertAndRemove() {
