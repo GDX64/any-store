@@ -8,12 +8,15 @@ const data = fs.readFileSync(wasmPath);
 describe("Database Module", () => {
   test("should initialize the database correctly", async () => {
     const wdb = await WDB.create(0, data);
-    const table = wdb.createTable({
-      name: "string",
-      age: "i32",
-      height: "f64",
-      data: "blob",
-    });
+    const table = wdb.createTable(
+      {
+        name: "string",
+        age: "i32",
+        height: "f64",
+        data: "blob",
+      },
+      "test_table",
+    );
     const k1 = WDB.i32(123);
     table.insert(k1, WDB.string("Alice"), "name");
     table.insert(k1, WDB.i32(30), "age");
@@ -51,11 +54,14 @@ describe("Database Module", () => {
     const data = fs.readFileSync(wasmPath);
     const wdb = await WDB.create(0, data);
     for (let t = 0; t < TABLES; t++) {
-      const table = wdb.createTable({
-        name: "string",
-        age: "i32",
-        height: "f64",
-      });
+      const table = wdb.createTable(
+        {
+          name: "string",
+          age: "i32",
+          height: "f64",
+        },
+        `table_${t}`,
+      );
 
       mockData.forEach((item, index) => {
         const key = WDB.i32(index);
@@ -83,9 +89,12 @@ describe("Database Module", () => {
 
   test("add listener to row", async () => {
     const wdb = await WDB.create(0, data);
-    const table = wdb.createTable({
-      counter: "i32",
-    });
+    const table = wdb.createTable(
+      {
+        counter: "i32",
+      },
+      "test_table",
+    );
     const row = table.row(WDB.i32(1));
     const fn = vi.fn();
     const listenerID = row.addListener(fn);
@@ -107,9 +116,12 @@ describe("Database Module", () => {
 
   test("cached row", async () => {
     const wdb = await WDB.create(0, data);
-    const table = wdb.createTable({
-      counter: "i32",
-    });
+    const table = wdb.createTable(
+      {
+        counter: "i32",
+      },
+      "test_table",
+    );
     const row = table.row(WDB.i32(1));
 
     const fn = vi.fn();

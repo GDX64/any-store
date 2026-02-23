@@ -24,9 +24,12 @@ describe("Web Worker", async () => {
 
     const db = await WDB.create(0);
     const row = db.withLock(() => {
-      const table = db.createTable({
-        counter: "i32",
-      });
+      const table = db.createTable(
+        {
+          counter: "i32",
+        },
+        "hello",
+      );
 
       const row = table.row(WDB.i32(1));
       row.update("counter", WDB.i32(0));

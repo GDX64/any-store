@@ -100,14 +100,18 @@ pub enum Operation {
     },
 }
 
+const NAMES_TABLE_INDEX: usize = 0;
+
 impl Database {
     pub fn new() -> Self {
-        Database {
+        let mut db = Database {
             last_table_id: 0,
             tables: HashMap::default(),
             next_listener_id: 0,
             something_stack: Default::default(),
-        }
+        };
+        db.tables.insert(NAMES_TABLE_INDEX, Table::new());
+        return db;
     }
 
     pub fn take_notifications(&mut self, worker_id: u8) -> Vec<i32> {
@@ -169,11 +173,23 @@ impl Database {
         return Some(listener_id);
     }
 
-    pub fn create_table(&mut self) -> usize {
+    pub fn create_table(&mut self, name: Something) -> usize {
         self.last_table_id += 1;
         let table_id = self.last_table_id;
         self.tables.insert(table_id, Table::new());
+        self.tables.get_mut(&NAMES_TABLE_INDEX).map(|table| {
+            table.insert_at(name, Something::Int(table_id as i32), 0);
+        });
         return table_id;
+    }
+
+    pub fn get_table_id(&self, name: Something) -> Option<usize> {
+        let table = self.tables.get(&NAMES_TABLE_INDEX)?;
+        let row = table.get(&name)?;
+        if let Something::Int(id) = row.get(0) {
+            return Some(*id as usize);
+        }
+        return None;
     }
 
     pub fn get_table_mut(&mut self, table_id: usize) -> Option<&mut Table> {

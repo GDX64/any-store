@@ -174,6 +174,10 @@ export class WDB {
     return new WDB(instance, memory, module);
   }
 
+  tableIDFromName(name: string): number | null {
+    return this.ops.getTableIDFromName(name);
+  }
+
   getTable<T extends ColMap>(tableID: number, colMap: T): Table<T> {
     return new Table<T>(colMap, tableID, this);
   }
@@ -182,8 +186,8 @@ export class WDB {
     return this.memory.buffer.byteLength;
   }
 
-  createTable<T extends ColMap>(colMap: T): Table<T> {
-    const id = this.ops.createTable();
+  createTable<T extends ColMap>(colMap: T, name: string): Table<T> {
+    const id = this.ops.createTable(name);
     return new Table<T>(colMap, id, this);
   }
 
@@ -434,6 +438,7 @@ interface ExportsInterface {
   table_add_listener_to_row(tableID: number): number;
   table_remove_listener(tableID: number, listenerID: number): void;
   table_get_something(tableID: number, col: number): void;
+  table_get_id_from_name(): number;
   table_insert_row(tableID: number): void;
   string_take(strIdx: number): number;
   delete_row_from_table(tableID: number): void;
@@ -451,8 +456,15 @@ class Ops {
     this.exports.unlock();
   }
 
-  createTable() {
+  createTable(name: string) {
+    this.putSomethingOnStack({ tag: "string", value: name });
     return this.exports.table_create();
+  }
+
+  getTableIDFromName(name: string): number | null {
+    this.putSomethingOnStack({ tag: "string", value: name });
+    const id = this.exports.table_get_id_from_name();
+    return id === -1 ? null : id;
   }
 
   putSomethingOnStack(value: Something) {

@@ -19,11 +19,14 @@ describe("benchmarks inserts", async () => {
     "insert on db",
     async () => {
       try {
-        const table = db.createTable({
-          name: "string",
-          age: "i32",
-          height: "f64",
-        });
+        const table = db.createTable(
+          {
+            name: "string",
+            age: "i32",
+            height: "f64",
+          },
+          "hello",
+        );
         mockData.forEach((item, index) => {
           const key = WDB.i32(index);
           table.insertRow(key, [item.name, item.age, item.height]);
@@ -93,11 +96,14 @@ describe("benchmarks selects", async () => {
     };
   });
   const db = await WDB.create(0, data);
-  const table = db.createTable({
-    name: "string",
-    age: "i32",
-    height: "f64",
-  });
+  const table = db.createTable(
+    {
+      name: "string",
+      age: "i32",
+      height: "f64",
+    },
+    "hello",
+  );
   mockData.forEach((item, index) => {
     const key = WDB.i32(index);
     table.insert(key, item.name, "name");

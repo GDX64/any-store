@@ -4,7 +4,12 @@ self.onmessage = async (event) => {
   console.log("Message from main thread:", event.data);
   const db = await WDB.fromModule(event.data.dbData);
   const row = db.withLock(() => {
-    const table = db.getTable(1, { counter: "i32" });
+    const id = db.tableIDFromName("hello");
+    if (!id) {
+      console.error("Table 'hello' not found");
+    }
+    console.log("Got table ID:", id);
+    const table = db.getTable(id, { counter: "i32" });
     const row = table.row(WDB.i32(1));
     return row;
   });

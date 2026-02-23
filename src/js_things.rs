@@ -31,11 +31,6 @@ impl GlobalPool {
         }
     }
 
-    fn add_table(&self) -> usize {
-        let mut db = self.db.write();
-        return db.create_table();
-    }
-
     fn with_db_mut<R, F: FnOnce(&mut Database) -> R>(&self, f: F) -> Option<R> {
         let mut pool = self.db.write();
         return Some(f(&mut pool));
@@ -68,7 +63,24 @@ pub fn start() {
 
 #[unsafe(no_mangle)]
 pub fn table_create() -> usize {
-    return GLOBALS.add_table() as usize;
+    return GLOBALS
+        .with_db_mut(|db| {
+            let name = pop_from_something_stack().expect("there shoud be a name for the table");
+            return db.create_table(name);
+        })
+        .unwrap_or(0);
+}
+
+#[unsafe(no_mangle)]
+pub fn table_get_id_from_name() -> i32 {
+    let name = pop_from_something_stack().expect("there should be a name for the table");
+    return GLOBALS
+        .with_db_mut(|db| {
+            return db.get_table_id(name);
+        })
+        .unwrap_or(None)
+        .map(|id| id as i32)
+        .unwrap_or(-1);
 }
 
 #[unsafe(no_mangle)]
