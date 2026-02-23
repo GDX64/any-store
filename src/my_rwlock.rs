@@ -1,5 +1,4 @@
 use std::{
-    arch::wasm32,
     cell::UnsafeCell,
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicI32, Ordering},
@@ -102,7 +101,7 @@ impl Lock {
             #[cfg(target_arch = "wasm32")]
             unsafe {
                 let ptr = self.is_locked.as_ptr();
-                wasm32::memory_atomic_wait32(ptr, 1, 1000_000);
+                std::arch::wasm32::memory_atomic_wait32(ptr, 1, 1000_000);
             }
         }
     }
@@ -111,7 +110,7 @@ impl Lock {
         self.is_locked.store(UNLOCKED, Ordering::Release);
         #[cfg(target_arch = "wasm32")]
         unsafe {
-            wasm32::memory_atomic_notify(self.is_locked.as_ptr(), 1);
+            std::arch::wasm32::memory_atomic_notify(self.is_locked.as_ptr(), 1);
         }
     }
 }

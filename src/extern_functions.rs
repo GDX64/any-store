@@ -136,8 +136,7 @@ mod extern_functions_mod {
         }
     }
 
-    // this is just to fill the tests
-    pub fn pop_mock_stack() -> Option<MockValue> {
+    pub fn with_stack_mut<R>(_f: impl FnOnce(&mut Vec<MockValue>) -> R) -> R {
         panic!("Not implemented in wasm");
     }
 
@@ -252,8 +251,8 @@ mod extern_functions_mod {
         MOCK_STACK.with(|stack| stack.borrow_mut().push(MockValue::Blob(data)));
     }
 
-    pub fn pop_mock_stack() -> Option<MockValue> {
-        MOCK_STACK.with(|stack| stack.borrow_mut().pop())
+    pub fn with_stack_mut<R>(f: impl FnOnce(&mut Vec<MockValue>) -> R) -> R {
+        MOCK_STACK.with(|stack| f(&mut stack.borrow_mut()))
     }
 
     pub fn get_mock_logs() -> Vec<String> {
