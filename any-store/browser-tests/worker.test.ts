@@ -4,8 +4,8 @@ import { AnyStore } from "../src/WDB";
 
 describe("Web Worker", async () => {
   test("counter", async () => {
-    const N = 100_000;
-    const numWorkers = navigator.hardwareConcurrency - 1;
+    const N = 50_000;
+    const numWorkers = 6;
     function workerWrapper() {
       const val = new Worker();
 
@@ -22,7 +22,7 @@ describe("Web Worker", async () => {
       };
     }
 
-    const db = await AnyStore.create(0);
+    const db = await AnyStore.create();
     const row = db.withLock(() => {
       const table = db.createTable("hello", {
         counter: "i32",

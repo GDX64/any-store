@@ -151,7 +151,7 @@ export class AnyStore {
 
   static async fromModule(workerData: WorkerData) {
     (globalThis as any).unsafe_worker_id = () => workerData.workerID;
-    const mod = await initModule(workerData.module, workerData.memory);
+    const mod = await initModule({ memory: workerData.memory });
     return new AnyStore(mod, workerData.memory);
   }
 
@@ -235,11 +235,9 @@ export class AnyStore {
   }
 
   createWorker(): WorkerData {
-    const module: WebAssembly.Module = this.out;
     this.workerID += 1;
     return {
       memory: this.memory,
-      module,
       workerID: this.workerID,
     };
   }

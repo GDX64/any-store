@@ -66,7 +66,9 @@ pub fn start() {
 pub fn table_create() -> usize {
     return GLOBALS
         .with_db_mut(|db| {
-            let name = pop_from_something_stack().expect("there shoud be a name for the table");
+            let name = db.something_stack[worker_id()]
+                .pop()
+                .expect("there shoud be a name for the table");
             return db.create_table(name);
         })
         .unwrap_or(0);
