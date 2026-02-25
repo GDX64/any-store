@@ -1,5 +1,16 @@
 import { AnyStore } from "../src/WDB";
 import { describe, expect, test, vi } from "vitest";
+import fs from "fs";
+//mock fetch
+
+vi.stubGlobal(
+  "fetch",
+  vi.fn(async (url: URL) => {
+    console.log(url);
+    const mod = fs.readFileSync(url.pathname.slice(1));
+    return mod;
+  }),
+);
 
 describe("Database Module", () => {
   test("should initialize the database correctly", async () => {
@@ -144,30 +155,30 @@ describe("Database Module", () => {
     expect(row.get("counter")).toBe(1);
   });
 
-  // test("worker modules in the same thread", async () => {
-  //   const wdb = await AnyStore.create();
+  test("worker modules in the same thread", async () => {
+    const wdb = await AnyStore.create();
 
-  //   wdb.createTable("table1", { counter: "i32" }); //not used
-  //   wdb.createTable("table2", { counter: "i32" }); //not used
+    wdb.createTable("table1", { counter: "i32" }); //not used
+    wdb.createTable("table2", { counter: "i32" }); //not used
 
-  //   const table = wdb.createTable("hello", { counter: "i32" });
-  //   const firstRow = table.row(AnyStore.i32(1));
-  //   firstRow.update("counter", AnyStore.i32(10));
+    const table = wdb.createTable("hello", { counter: "i32" });
+    const firstRow = table.row(AnyStore.i32(1));
+    firstRow.update("counter", AnyStore.i32(10));
 
-  //   const module = wdb.createWorker();
-  //   const other = await AnyStore.fromModule(module);
+    const module = wdb.createWorker();
+    const other = await AnyStore.fromModule(module);
 
-  //   const otherTable = other.getTable("hello", { counter: "i32" });
-  //   if (!otherTable) {
-  //     throw new Error("Table 'hello' not found in other module");
-  //   }
+    const otherTable = other.getTable("hello", { counter: "i32" });
+    if (!otherTable) {
+      throw new Error("Table 'hello' not found in other module");
+    }
 
-  //   const otherRow = otherTable.row(AnyStore.i32(1));
-  //   expect(otherRow.get("counter")).toBe(10);
+    const otherRow = otherTable.row(AnyStore.i32(1));
+    expect(otherRow.get("counter")).toBe(10);
 
-  //   otherRow.update("counter", AnyStore.i32(20));
-  //   expect(firstRow.get("counter")).toBe(20);
-  // });
+    otherRow.update("counter", AnyStore.i32(20));
+    expect(firstRow.get("counter")).toBe(20);
+  });
 
   test("stress memory", async () => {
     const mockData = new Map<

@@ -96,7 +96,12 @@ const ops = {
   js_push_to_blob,
   js_read_blob_length,
   js_read_blob_byte,
+  unsafe_worker_id: () => 0,
 };
+
+for (const op in ops) {
+  (globalThis as any)[op] = (ops as any)[op];
+}
 
 type WorkerData = {
   module: WebAssembly.Module;
@@ -395,10 +400,7 @@ export type Something =
 
 class Ops {
   constructor(private out: InitOutput) {
-    this.exports = out as unknown as ExportsInterface;
-    this.exports.lock();
     this.exports.start();
-    this.exports.unlock();
   }
 
   get exports() {
