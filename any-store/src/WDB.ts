@@ -114,8 +114,11 @@ export class AnyStore {
   private listeners: Map<number, () => void> = new Map();
   private workerID: number = 0;
 
-  constructor(mod: InitOutput) {
-    this.ops = new Ops(mod);
+  constructor(
+    private out: InitOutput,
+    private memory: WebAssembly.Memory,
+  ) {
+    this.ops = new Ops(out);
   }
 
   withLock<T>(fn: () => T): T {
@@ -137,21 +140,19 @@ export class AnyStore {
   }
 
   static async create() {
-    const mod = await initModule();
-    return new AnyStore(mod);
+    const memory = new WebAssembly.Memory({
+      initial: 20,
+      maximum: 1000,
+      shared: true,
+    });
+    const mod = await initModule({ memory });
+    return new AnyStore(mod, memory);
   }
 
   static async fromModule(workerData: WorkerData) {
-    const { module, memory, workerID } = workerData;
-    const worker_id = () => workerID;
-    const instance = await WebAssembly.instantiate(module, {
-      env: {
-        memory,
-        worker_id,
-      },
-      ops,
-    });
-    // return new AnyStore(instance, memory, module);
+    (globalThis as any).unsafe_worker_id = () => workerData.workerID;
+    const mod = await initModule(workerData.module, workerData.memory);
+    return new AnyStore(mod, workerData.memory);
   }
 
   getTable<T extends ColMap>(name: string, colMap: T): Table<T> | null {
@@ -233,9 +234,14 @@ export class AnyStore {
     return getWholeStack();
   }
 
-  createWorker() {
+  createWorker(): WorkerData {
+    const module: WebAssembly.Module = this.out;
     this.workerID += 1;
-    return {};
+    return {
+      memory: this.memory,
+      module,
+      workerID: this.workerID,
+    };
   }
 
   static i32(value: number): Something {

@@ -6,7 +6,6 @@ import fs from "fs";
 vi.stubGlobal(
   "fetch",
   vi.fn(async (url: URL) => {
-    console.log(url);
     const mod = fs.readFileSync(url.pathname.slice(1));
     return mod;
   }),
