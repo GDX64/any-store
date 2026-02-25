@@ -104,7 +104,6 @@ for (const op in ops) {
 }
 
 type WorkerData = {
-  module: WebAssembly.Module;
   memory: WebAssembly.Memory;
   workerID: number;
 };
@@ -115,7 +114,7 @@ export class AnyStore {
   private workerID: number = 0;
 
   constructor(
-    private out: InitOutput,
+    out: InitOutput,
     private memory: WebAssembly.Memory,
   ) {
     this.ops = new Ops(out);
