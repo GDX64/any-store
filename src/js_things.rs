@@ -1,3 +1,5 @@
+use wasm_bindgen::prelude::wasm_bindgen;
+
 use crate::{
     extern_functions::*,
     my_rwlock::{Lock, MyRwLock},
@@ -39,17 +41,17 @@ impl GlobalPool {
 
 static GLOBALS: LazyLock<GlobalPool> = LazyLock::new(|| GlobalPool::new());
 
-#[unsafe(no_mangle)]
+#[wasm_bindgen]
 pub fn lock() {
     GLOBAL_LOCK.lock();
 }
 
-#[unsafe(no_mangle)]
+#[wasm_bindgen]
 pub fn unlock() {
     GLOBAL_LOCK.unlock();
 }
 
-#[unsafe(no_mangle)]
+#[wasm_bindgen]
 pub fn start() {
     if worker_id() == 0 {
         std::panic::set_hook(Box::new(|info| {
@@ -60,7 +62,7 @@ pub fn start() {
     }
 }
 
-#[unsafe(no_mangle)]
+#[wasm_bindgen]
 pub fn table_create() -> usize {
     return GLOBALS
         .with_db_mut(|db| {
@@ -70,7 +72,7 @@ pub fn table_create() -> usize {
         .unwrap_or(0);
 }
 
-#[unsafe(no_mangle)]
+#[wasm_bindgen]
 pub fn table_get_id_from_name() -> i32 {
     let name = pop_from_something_stack().expect("there should be a name for the table");
     return GLOBALS
@@ -82,8 +84,12 @@ pub fn table_get_id_from_name() -> i32 {
         .unwrap_or(-1);
 }
 
-#[unsafe(no_mangle)]
-pub fn table_get_something(table: usize, col: usize) -> Option<()> {
+#[wasm_bindgen]
+pub fn table_get_something(table: usize, col: usize) {
+    _table_get_something(table, col);
+}
+
+fn _table_get_something(table: usize, col: usize) -> Option<()> {
     let key = pop_from_something_stack()?;
     let something = GLOBALS.with_db_mut(|db| {
         let table = db.get_table(table)?;
@@ -95,8 +101,12 @@ pub fn table_get_something(table: usize, col: usize) -> Option<()> {
     return Some(());
 }
 
-#[unsafe(no_mangle)]
-pub fn table_get_row(table: usize) -> Option<()> {
+#[wasm_bindgen]
+pub fn table_get_row(table: usize) {
+    _table_get_row(table);
+}
+
+fn _table_get_row(table: usize) -> Option<()> {
     let key = pop_from_something_stack()?;
     let row = GLOBALS.with_db_mut(|db| {
         let table = db.get_table(table)?;
@@ -108,10 +118,14 @@ pub fn table_get_row(table: usize) -> Option<()> {
     return Some(());
 }
 
-#[unsafe(no_mangle)]
-pub fn table_insert(table: usize, col: usize) -> Option<()> {
-    let value = pop_from_something_stack()?;
-    let key = pop_from_something_stack()?;
+#[wasm_bindgen]
+pub fn table_insert(table: usize, col: usize) {
+    let Some(value) = pop_from_something_stack() else {
+        return;
+    };
+    let Some(key) = pop_from_something_stack() else {
+        return;
+    };
     GLOBALS.with_db_mut(|db| {
         db.operation(Operation::Insert {
             table_id: table,
@@ -120,11 +134,10 @@ pub fn table_insert(table: usize, col: usize) -> Option<()> {
             index: col,
         });
     });
-    return Some(());
 }
 
-#[unsafe(no_mangle)]
-pub fn table_insert_row(table: usize) -> Option<()> {
+#[wasm_bindgen]
+pub fn table_insert_row(table: usize) {
     GLOBALS.with_db_mut(|db| {
         let v = { mem::take(&mut db.something_stack[worker_id()]) };
         db.operation(Operation::InsertRow {
@@ -132,17 +145,16 @@ pub fn table_insert_row(table: usize) -> Option<()> {
             data: v,
         });
     });
-    return Some(());
 }
 
-#[unsafe(no_mangle)]
+#[wasm_bindgen]
 pub fn something_push_i32_to_stack(value: i32) {
     let something = Something::Int(value);
     push_to_something_stack(something);
 }
 
-#[unsafe(no_mangle)]
-pub fn something_push_string() -> Option<()> {
+#[wasm_bindgen]
+pub fn something_push_string() {
     let len = safe_read_string_length();
     let mut bytes = Vec::with_capacity(len);
     for i in 0..len {
@@ -152,50 +164,51 @@ pub fn something_push_string() -> Option<()> {
     safe_js_pop_stack();
     let something = Something::String(bytes);
     push_to_something_stack(something);
-    return Some(());
 }
 
-#[unsafe(no_mangle)]
+#[wasm_bindgen]
 pub fn something_push_f64_to_stack(value: f64) {
     let something = Something::Float(value);
     push_to_something_stack(something);
 }
 
-#[unsafe(no_mangle)]
-pub fn delete_row_from_table(table_id: usize) -> Option<()> {
-    let something = pop_from_something_stack()?;
+#[wasm_bindgen]
+pub fn delete_row_from_table(table_id: usize) {
+    let Some(something) = pop_from_something_stack() else {
+        return;
+    };
     GLOBALS.with_db_mut(|db| {
         db.operation(Operation::RowDelete {
             table_id,
             key: something,
         });
     });
-    return Some(());
 }
 
-#[unsafe(no_mangle)]
-pub fn table_remove_listener(table_id: usize, listener_id: u32) -> Option<()> {
-    let key = pop_from_something_stack()?;
+#[wasm_bindgen]
+pub fn table_remove_listener(table_id: usize, listener_id: u32) {
+    let Some(key) = pop_from_something_stack() else {
+        return;
+    };
     GLOBALS.with_db_mut(|db| {
         db.remove_listener(table_id, &key, listener_id);
     });
-    return Some(());
 }
 
-#[unsafe(no_mangle)]
-pub fn db_take_notifications() -> Option<()> {
-    let notifications = GLOBALS.with_db_mut(|db| {
+#[wasm_bindgen]
+pub fn db_take_notifications() {
+    let Some(notifications) = GLOBALS.with_db_mut(|db| {
         return db.take_notifications(worker_id() as u8);
-    })?;
+    }) else {
+        return;
+    };
 
     for notification in notifications {
         safe_put_i32(notification);
     }
-
-    return Some(());
 }
 
-#[unsafe(no_mangle)]
+#[wasm_bindgen]
 pub fn table_add_listener_to_row(table_id: usize) -> i32 {
     fn inner(table_id: usize) -> Option<ListenerID> {
         let something = pop_from_something_stack()?;
@@ -207,8 +220,8 @@ pub fn table_add_listener_to_row(table_id: usize) -> i32 {
     return inner(table_id).map(|id| id.to_i32()).unwrap_or(-1);
 }
 
-#[unsafe(no_mangle)]
-pub fn something_push_blob() -> Option<()> {
+#[wasm_bindgen]
+pub fn something_push_blob() {
     let len = safe_read_blob_length();
     let mut bytes = Vec::with_capacity(len);
     for i in 0..len {
@@ -218,7 +231,6 @@ pub fn something_push_blob() -> Option<()> {
     safe_js_pop_stack();
     let something = Something::Blob(bytes);
     push_to_something_stack(something);
-    return Some(());
 }
 
 fn add_something_to_js_stack(value: &Something) {

@@ -2,8 +2,12 @@
 rustflags = [
   "-C", "target-feature=+atomics,+bulk-memory,+mutable-globals,+simd128",
   "-C", "link-arg=--shared-memory",
+  "-C", "link-arg=--import-memory",
+  "-C", "link-args=--export=__wasm_init_tls",
+  "-C", "link-args=--export=__tls_size",
+  "-C", "link-args=--export=__tls_align",
+  "-C", "link-args=--export=__tls_base",
   "-C", "link-arg=--max-memory=1073741824",
-  "-C", "link-arg=--import-memory"
 ]
 
 [unstable]

@@ -17,7 +17,7 @@ fn it_works() {
     js::something_push_i32_to_stack(28);
     js::table_insert(table, COL);
     js::something_push_i32_to_stack(17);
-    js::table_get_something(table, COL).expect("must get something");
+    js::table_get_something(table, COL);
     let value = pop_mock_stack().unwrap();
     assert_eq!(value, MockValue::Int(28));
 }

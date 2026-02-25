@@ -1,4 +1,4 @@
-import wasmModule from "../../target/wasm32-unknown-unknown/release/any_store.wasm?url";
+import initModule, { type InitOutput } from "../pkg/any_store";
 
 const jsStack: any[] = [];
 
@@ -109,12 +109,8 @@ export class AnyStore {
   private listeners: Map<number, () => void> = new Map();
   private workerID: number = 0;
 
-  constructor(
-    wasmInstance: WebAssembly.Instance,
-    private memory: WebAssembly.Memory,
-    private module: WebAssembly.Module,
-  ) {
-    this.ops = new Ops(wasmInstance);
+  constructor(mod: InitOutput) {
+    this.ops = new Ops(mod);
   }
 
   withLock<T>(fn: () => T): T {
@@ -135,30 +131,9 @@ export class AnyStore {
     this.ops.unlock();
   }
 
-  static async create(id: number = 0, bufferSource?: BufferSource) {
-    let data: BufferSource;
-    if (bufferSource) {
-      data = bufferSource;
-    } else {
-      const response = await fetch(wasmModule);
-      data = await response.arrayBuffer();
-    }
-    const memory = new WebAssembly.Memory({
-      initial: 20,
-      maximum: 10_000,
-      shared: true,
-    });
-    const worker_id = () => id;
-    const importObj = {
-      env: {
-        memory,
-        worker_id,
-      },
-      ops,
-    };
-    const res = await WebAssembly.instantiate(data, importObj);
-    const { instance, module } = res;
-    return new AnyStore(instance, memory, module);
+  static async create() {
+    const mod = await initModule();
+    return new AnyStore(mod);
   }
 
   static async fromModule(workerData: WorkerData) {
@@ -171,7 +146,7 @@ export class AnyStore {
       },
       ops,
     });
-    return new AnyStore(instance, memory, module);
+    // return new AnyStore(instance, memory, module);
   }
 
   getTable<T extends ColMap>(name: string, colMap: T): Table<T> | null {
@@ -183,8 +158,7 @@ export class AnyStore {
   }
 
   memSize() {
-    const pageSize = 2 ** 16; // WebAssembly page size is 64KiB
-    return this.memory.buffer.byteLength / pageSize;
+    return 0;
   }
 
   createTable<T extends ColMap>(name: string, colMap: T): Table<T> {
@@ -256,11 +230,7 @@ export class AnyStore {
 
   createWorker() {
     this.workerID += 1;
-    return {
-      memory: this.memory,
-      module: this.module,
-      workerID: this.workerID,
-    };
+    return {};
   }
 
   static i32(value: number): Something {
@@ -423,38 +393,16 @@ export type Something =
       value: Uint8Array;
     };
 
-interface ExportsInterface {
-  something_push_i32_to_stack(value: number): void;
-  something_pop_i32_from_stack(): number;
-  something_push_f64_to_stack(value: number): void;
-  something_pop_f64_from_stack(): number;
-  something_pop_from_stack(): number;
-  something_push_null_to_stack(): void;
-  something_push_string(): void;
-  something_push_blob(size: number): void;
-  db_take_notifications(): void;
-  table_create(): number;
-  table_insert(tableID: number, col: number): void;
-  table_get_row(tableID: number): void;
-  table_add_listener_to_row(tableID: number): number;
-  table_remove_listener(tableID: number, listenerID: number): void;
-  table_get_something(tableID: number, col: number): void;
-  table_get_id_from_name(): number;
-  table_insert_row(tableID: number): void;
-  string_take(strIdx: number): number;
-  delete_row_from_table(tableID: number): void;
-  start(): void;
-  lock(): void;
-  unlock(): void;
-}
-
 class Ops {
-  exports: ExportsInterface;
-  constructor(instance: WebAssembly.Instance) {
-    this.exports = instance.exports as unknown as ExportsInterface;
+  constructor(private out: InitOutput) {
+    this.exports = out as unknown as ExportsInterface;
     this.exports.lock();
     this.exports.start();
     this.exports.unlock();
+  }
+
+  get exports() {
+    return this.out;
   }
 
   createTable(name: string) {
@@ -496,12 +444,12 @@ class Ops {
   }
 
   pushNullToStack(): void {
-    this.exports.something_push_null_to_stack();
+    // this.exports.something_push_null_to_stack();
   }
 
   somethingPushBlobToStack(value: Uint8Array): void {
     pushBlobToStack(value);
-    this.exports.something_push_blob(value.length);
+    this.exports.something_push_blob();
   }
 
   lock() {
@@ -530,17 +478,9 @@ class Ops {
     this.exports.something_push_i32_to_stack(value);
   }
 
-  somethingPopi32FromStack(): number {
-    return this.exports.something_pop_i32_from_stack();
-  }
-
   pushStringToStack(str: string): void {
     pushToStringStack(str);
     this.exports.something_push_string();
-  }
-
-  somethingPopFromStack() {
-    return this.exports.something_pop_from_stack();
   }
 
   tableInsert(tableID: number, col: number): void {

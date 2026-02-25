@@ -11,30 +11,41 @@ pub enum MockValue {
 
 #[cfg(target_arch = "wasm32")]
 mod extern_functions_mod {
+    use wasm_bindgen::prelude::wasm_bindgen;
+
     use crate::extern_functions::MockValue;
 
-    #[link(wasm_import_module = "ops")]
+    #[wasm_bindgen]
     unsafe extern "C" {
         // unsafe fn log_message(ptr: *const u8, len: usize);
 
-        unsafe fn js_read_string(index: usize) -> u8;
-        unsafe fn js_push_to_string(byte: u8);
-        unsafe fn js_read_string_length() -> usize;
-        unsafe fn js_pop_stack();
-        unsafe fn js_push_string_to_stack();
-        unsafe fn js_put_i32(value: i32);
-        unsafe fn js_put_f64(value: f64);
-        unsafe fn js_log_stack_value();
-        unsafe fn js_push_null();
-        unsafe fn js_create_blob(size: usize);
-        unsafe fn js_push_to_blob(byte: u8);
-        unsafe fn js_read_blob_length() -> usize;
-        unsafe fn js_read_blob_byte(index: usize) -> u8;
-    }
-
-    #[link(wasm_import_module = "env")]
-    unsafe extern "C" {
-        #[link_name = "worker_id"]
+        #[wasm_bindgen]
+        fn js_read_string(index: usize) -> u8;
+        #[wasm_bindgen]
+        fn js_push_to_string(byte: u8);
+        #[wasm_bindgen]
+        fn js_read_string_length() -> usize;
+        #[wasm_bindgen]
+        fn js_pop_stack();
+        #[wasm_bindgen]
+        fn js_push_string_to_stack();
+        #[wasm_bindgen]
+        fn js_put_i32(value: i32);
+        #[wasm_bindgen]
+        fn js_put_f64(value: f64);
+        #[wasm_bindgen]
+        fn js_log_stack_value();
+        #[wasm_bindgen]
+        fn js_push_null();
+        #[wasm_bindgen]
+        fn js_create_blob(size: usize);
+        #[wasm_bindgen]
+        fn js_push_to_blob(byte: u8);
+        #[wasm_bindgen]
+        fn js_read_blob_length() -> usize;
+        #[wasm_bindgen]
+        fn js_read_blob_byte(index: usize) -> u8;
+        #[wasm_bindgen]
         fn unsafe_worker_id() -> i32;
     }
 

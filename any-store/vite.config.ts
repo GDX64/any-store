@@ -25,6 +25,12 @@ export default defineConfig({
       "Cross-Origin-Opener-Policy": "same-origin",
       "Cross-Origin-Embedder-Policy": "require-corp",
     },
+    fs: {
+      // Allow serving files from one level up to the project root
+      allow: [".."],
+      // Or specify exact paths
+      // allow: ['/path/to/external/dir', '../other-project']
+    },
   },
   test: {
     environment: "node",
