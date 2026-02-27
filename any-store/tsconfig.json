@@ -1,16 +1,17 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "es2024",
     "useDefineForClassFields": true,
     "module": "ESNext",
     "lib": [
-      "ES2022",
+      "ES2024",
       "DOM",
       "DOM.Iterable",
       "WebWorker",
       "ESNext.Iterator",
       "ESNext.AsyncIterable",
-      "WebWorker.AsyncIterable"
+      "WebWorker.AsyncIterable",
+      "ESNext.Sharedmemory"
     ],
     "types": ["vite/client", "@types/node"],
     "skipLibCheck": true,
@@ -35,4 +36,3 @@
   },
   "include": ["src", "tests", "browser-tests"]
 }
-

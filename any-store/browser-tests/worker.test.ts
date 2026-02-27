@@ -36,7 +36,7 @@ describe("Web Worker", async () => {
     const workers = Array.from({ length: numWorkers }, workerWrapper);
 
     for (let i = 0; i < N; i++) {
-      db.withLock(() => {
+      await db.withLockAsync(async () => {
         const current = row.get("counter") as number;
         row.update("counter", AnyStore.i32(current + 1));
       });

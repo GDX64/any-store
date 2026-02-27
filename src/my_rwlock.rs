@@ -95,4 +95,15 @@ impl Lock {
             std::arch::wasm32::memory_atomic_notify(self.is_locked.as_ptr(), 1);
         }
     }
+
+    pub fn try_lock(&self) -> bool {
+        return self
+            .is_locked
+            .compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok();
+    }
+
+    pub fn pointer(&self) -> *const i32 {
+        return self.is_locked.as_ptr();
+    }
 }

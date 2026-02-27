@@ -68,6 +68,16 @@ pub fn unlock() {
 }
 
 #[wasm_bindgen]
+pub fn try_lock() -> bool {
+    return GLOBAL_LOCK.try_lock();
+}
+
+#[wasm_bindgen]
+pub fn lock_pointer() -> *const i32 {
+    return GLOBAL_LOCK.pointer();
+}
+
+#[wasm_bindgen]
 pub fn start() {
     if worker_id() == 0 {
         std::panic::set_hook(Box::new(|info| {

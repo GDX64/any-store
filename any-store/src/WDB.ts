@@ -120,6 +120,40 @@ export class AnyStore {
     this.ops = new Ops(out);
   }
 
+  private async lockAsync() {
+    while (true) {
+      const success = this.ops.exports.try_lock();
+      if (success) {
+        return;
+      } else {
+        const pointer = this.ops.exports.lock_pointer();
+        const array = new Int32Array(this.memory.buffer, pointer, 1);
+        await Atomics.waitAsync(array, 0, 0);
+      }
+    }
+  }
+
+  /**
+   * This function will probably be less performant than withLock
+   * but it wont block the current thread in the case the lock
+   * cant be acquired
+   */
+  async withLockAsync<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      await this.lockAsync();
+      const result = await fn();
+      return result;
+    } finally {
+      this.unlock();
+    }
+  }
+
+  /**
+   * This function will block the thread in
+   * web workers in the case some worker has the lock
+   * it wont burn CPU on workers though because of Atomic.wait
+   * On the main thread it will spin loop and burn CPU until it gets the lock
+   */
   withLock<T>(fn: () => T): T {
     try {
       this.lock();
