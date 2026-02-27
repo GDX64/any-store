@@ -6,18 +6,34 @@ use crate::{
     storage::{Database, ListenerID, Operation},
     value::Something,
 };
-use std::{mem, sync::LazyLock};
+use std::sync::LazyLock;
 
-fn push_to_something_stack(value: Something) {
-    GLOBALS.with_db_mut(|db| {
-        db.something_stack[worker_id()].push(value);
+thread_local! {
+    static SOMETHING_STACK: std::cell::RefCell<Vec<Something>> = std::cell::RefCell::new(Vec::new());
+}
+
+fn pop_something() -> Option<Something> {
+    return SOMETHING_STACK.with(|stack| stack.borrow_mut().pop());
+}
+
+fn push_something(value: Something) {
+    SOMETHING_STACK.with(|stack| stack.borrow_mut().push(value));
+}
+
+fn take_something_stack() -> Vec<Something> {
+    return SOMETHING_STACK.with(|stack| {
+        let v = stack.clone();
+        stack.borrow_mut().clear();
+        return v.into_inner();
     });
 }
 
+fn push_to_something_stack(value: Something) {
+    push_something(value);
+}
+
 fn pop_from_something_stack() -> Option<Something> {
-    return GLOBALS.with_db_mut(|db| {
-        return db.something_stack[worker_id()].pop();
-    })?;
+    return pop_something();
 }
 
 static GLOBAL_LOCK: Lock = Lock::new();
@@ -66,9 +82,7 @@ pub fn start() {
 pub fn table_create() -> usize {
     return GLOBALS
         .with_db_mut(|db| {
-            let name = db.something_stack[worker_id()]
-                .pop()
-                .expect("there shoud be a name for the table");
+            let name = pop_from_something_stack().expect("there should be a name for the table");
             return db.create_table(name);
         })
         .unwrap_or(0);
@@ -141,7 +155,7 @@ pub fn table_insert(table: usize, col: usize) {
 #[wasm_bindgen]
 pub fn table_insert_row(table: usize) {
     GLOBALS.with_db_mut(|db| {
-        let v = { mem::take(&mut db.something_stack[worker_id()]) };
+        let v = take_something_stack();
         db.operation(Operation::InsertRow {
             table_id: table,
             data: v,

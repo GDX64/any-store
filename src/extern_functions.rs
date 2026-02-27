@@ -54,65 +54,45 @@ mod extern_functions_mod {
     }
 
     pub fn worker_id() -> usize {
-        unsafe {
-            return unsafe_worker_id() as usize;
-        }
+        return unsafe_worker_id() as usize;
     }
 
     pub fn safe_read_string(index: usize) -> u8 {
-        unsafe {
-            let byte = js_read_string(index);
-            return byte;
-        }
+        let byte = js_read_string(index);
+        return byte;
     }
 
     pub fn safe_create_string() {
-        unsafe {
-            js_push_string_to_stack();
-        }
+        js_push_string_to_stack();
     }
 
     pub fn safe_push_to_string(byte: u8) {
-        unsafe {
-            js_push_to_string(byte);
-        }
+        js_push_to_string(byte);
     }
 
     pub fn safe_read_string_length() -> usize {
-        unsafe {
-            let len = js_read_string_length();
-            return len;
-        }
+        let len = js_read_string_length();
+        return len;
     }
 
     pub fn safe_put_i32(value: i32) {
-        unsafe {
-            js_put_i32(value);
-        }
+        js_put_i32(value);
     }
 
     pub fn safe_put_f64(value: f64) {
-        unsafe {
-            js_put_f64(value);
-        }
+        js_put_f64(value);
     }
 
     pub fn safe_js_pop_stack() {
-        unsafe {
-            js_pop_stack();
-        }
+        js_pop_stack();
     }
 
     pub fn safe_push_null() {
-        unsafe {
-            js_push_null();
-        }
+        js_push_null();
     }
 
     pub fn safe_log_stack_value() {
-        unsafe {
-            js_log_stack_value();
-        }
+        js_log_stack_value();
     }
 
     pub fn log_string(message: &str) {
@@ -124,27 +104,19 @@ mod extern_functions_mod {
     }
 
     pub fn safe_create_blob(size: usize) {
-        unsafe {
-            js_create_blob(size);
-        }
+        js_create_blob(size);
     }
 
     pub fn safe_push_to_blob(byte: u8) {
-        unsafe {
-            js_push_to_blob(byte);
-        }
+        js_push_to_blob(byte);
     }
 
     pub fn safe_read_blob_length() -> usize {
-        unsafe {
-            return js_read_blob_length();
-        }
+        return js_read_blob_length();
     }
 
     pub fn safe_read_blob_byte(index: usize) -> u8 {
-        unsafe {
-            return js_read_blob_byte(index);
-        }
+        return js_read_blob_byte(index);
     }
 
     pub fn with_stack_mut<R>(_f: impl FnOnce(&mut Vec<MockValue>) -> R) -> R {

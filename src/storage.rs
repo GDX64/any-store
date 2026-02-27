@@ -80,7 +80,6 @@ pub struct Database {
     last_table_id: usize,
     tables: HashMap<usize, Table>,
     next_listener_id: u32,
-    pub something_stack: [Vec<Something>; 16],
 }
 
 pub enum Operation {
@@ -108,7 +107,6 @@ impl Database {
             last_table_id: 0,
             tables: HashMap::default(),
             next_listener_id: 0,
-            something_stack: Default::default(),
         };
         db.tables.insert(NAMES_TABLE_INDEX, Table::new());
         return db;

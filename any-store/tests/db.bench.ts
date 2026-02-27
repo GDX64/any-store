@@ -1,10 +1,16 @@
-import { bench, describe } from "vitest";
+import { bench, describe, vi } from "vitest";
 import { AnyStore } from "../src/WDB";
 import { DatabaseSync } from "node:sqlite";
 import fs from "fs";
-const wasmPath = "../target/wasm32-unknown-unknown/release/any_store.wasm";
 
-const data = fs.readFileSync(wasmPath);
+vi.stubGlobal(
+  "fetch",
+  vi.fn(async (url: URL) => {
+    const mod = fs.readFileSync(url.pathname.slice(1));
+    return mod;
+  }),
+);
+
 describe("benchmarks inserts", async () => {
   const mockData = Array.from({ length: 100 }, (_, i) => {
     return {
@@ -13,7 +19,7 @@ describe("benchmarks inserts", async () => {
       name: AnyStore.string("PETR4" + i),
     };
   });
-  const db = await AnyStore.create(0, data);
+  const db = await AnyStore.create();
 
   bench(
     "insert on db",
@@ -92,7 +98,7 @@ describe("benchmarks selects", async () => {
       name: AnyStore.string("PETR4" + i),
     };
   });
-  const db = await AnyStore.create(0, data);
+  const db = await AnyStore.create();
   const table = db.createTable("hello", {
     name: "string",
     age: "i32",
