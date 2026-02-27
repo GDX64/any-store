@@ -28,10 +28,17 @@ describe("Database Module", () => {
     table.insert(AnyStore.i32(0), AnyStore.string("Bob"), "name");
 
     const row1 = table.row(k1);
-    expect(row1.get("name")).toBe("Alice");
-    expect(row1.get("age")).toBe(30);
-    expect(row1.get("height")).toBeCloseTo(1.75);
-    expect(row1.get("data")).toEqual(new Uint8Array([1, 2, 3]));
+
+    //assert types
+    const name1: string | null = row1.get("name");
+    const age1: number | null = row1.get("age");
+    const height1: number | null = row1.get("height");
+    const data1: Uint8Array | null = row1.get("data");
+
+    expect(name1).toBe("Alice");
+    expect(age1).toBe(30);
+    expect(height1).toBeCloseTo(1.75);
+    expect(data1).toEqual(new Uint8Array([1, 2, 3]));
     row1.delete();
 
     expect(row1.get("name")).toBeNull();

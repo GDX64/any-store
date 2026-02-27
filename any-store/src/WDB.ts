@@ -112,6 +112,11 @@ type WorkerData = {
   workerID: number;
 };
 
+// type SomethingWithTag<T> = Pick<Something, Extract<Something["tag"], T>>;
+
+type SomethingWithTag<T> = Extract<Something, { tag: T }>;
+type A = SomethingWithTag<"i32">; // { tag: "i32"; value: number }
+
 export class AnyStore {
   private ops: Ops;
   private listeners: Map<number, () => void> = new Map();
@@ -279,28 +284,28 @@ export class AnyStore {
     };
   }
 
-  static i32(value: number): Something {
+  static i32(value: number): I32 {
     return { tag: "i32", value };
   }
 
-  static f64(value: number): Something {
+  static f64(value: number): F64 {
     return { tag: "f64", value };
   }
 
-  static blob(value: Uint8Array): Something {
+  static blob(value: Uint8Array): Blob {
     return { tag: "blob", value };
   }
 
-  static string(value: string): Something {
+  static string(value: string): String {
     return { tag: "string", value };
+  }
+
+  static null(): Null {
+    return { tag: "null", value: null };
   }
 
   static stack() {
     return jsStack;
-  }
-
-  static null(): Something {
-    return { tag: "null", value: null };
   }
 
   static somethingFromValue(value: any): Something | null {
@@ -318,6 +323,14 @@ export class AnyStore {
 }
 
 type ColMap = Record<string, Something["tag"]>;
+
+type ValueMap = {
+  i32: number;
+  string: string;
+  null: null;
+  f64: number;
+  blob: Uint8Array;
+};
 
 export class Table<T extends ColMap> {
   colMap: Map<string, number> = new Map();
@@ -374,12 +387,13 @@ export class Row<T extends ColMap> {
     private key: Something,
   ) {}
 
-  get<K extends keyof T>(colName: K): Something["value"] | null {
+  get<K extends keyof T>(colName: K): ValueMap[T[K]] | null {
+    type MyValue = ValueMap[T[K]];
     if (this.cache) {
       const col = this.table.colMap.get(colName as string);
-      return col != null ? this.cache[col] : null;
+      return col != null ? (this.cache[col] as MyValue) : null;
     }
-    return this.table.get(this.key, colName);
+    return this.table.get(this.key, colName) as MyValue;
   }
 
   private load() {
@@ -401,7 +415,7 @@ export class Row<T extends ColMap> {
     return this.table.deleteRow(this.key);
   }
 
-  update<K extends keyof T>(colName: K, value: Something) {
+  update<K extends keyof T>(colName: K, value: SomethingWithTag<T[K]> | Null) {
     this.table.insert(this.key, value, colName);
   }
 
@@ -417,27 +431,13 @@ export class Row<T extends ColMap> {
   }
 }
 
-export type Something =
-  | {
-      tag: "i32";
-      value: number;
-    }
-  | {
-      tag: "string";
-      value: string;
-    }
-  | {
-      tag: "null";
-      value: null;
-    }
-  | {
-      tag: "f64";
-      value: number;
-    }
-  | {
-      tag: "blob";
-      value: Uint8Array;
-    };
+type I32 = { tag: "i32"; value: number };
+type String = { tag: "string"; value: string };
+type Null = { tag: "null"; value: null };
+type F64 = { tag: "f64"; value: number };
+type Blob = { tag: "blob"; value: Uint8Array };
+
+export type Something = I32 | String | Null | F64 | Blob;
 
 class Ops {
   constructor(private out: InitOutput) {
