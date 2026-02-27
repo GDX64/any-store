@@ -81,6 +81,10 @@ function js_push_to_blob(byte: number) {
   blob.index += 1;
 }
 
+function startWorkerID(workerID: number) {
+  (globalThis as any).unsafe_worker_id = () => workerID;
+}
+
 const ops = {
   js_put_i32,
   js_put_f64,
@@ -183,7 +187,7 @@ export class AnyStore {
   }
 
   static async fromModule(workerData: WorkerData) {
-    (globalThis as any).unsafe_worker_id = () => workerData.workerID;
+    startWorkerID(workerData.workerID);
     const mod = await initModule({ memory: workerData.memory });
     return new AnyStore(mod, workerData.memory);
   }
