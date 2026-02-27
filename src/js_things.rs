@@ -199,6 +199,12 @@ pub fn something_push_f64_to_stack(value: f64) {
 }
 
 #[wasm_bindgen]
+pub fn something_push_null_to_stack() {
+    let something = Something::Null;
+    push_to_something_stack(something);
+}
+
+#[wasm_bindgen]
 pub fn delete_row_from_table(table_id: usize) {
     let Some(something) = pop_from_something_stack() else {
         return;

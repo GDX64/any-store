@@ -487,7 +487,7 @@ class Ops {
   }
 
   pushNullToStack(): void {
-    // this.exports.something_push_null_to_stack();
+    this.exports.something_push_null_to_stack();
   }
 
   somethingPushBlobToStack(value: Uint8Array): void {

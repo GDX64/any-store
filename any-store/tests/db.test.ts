@@ -38,6 +38,9 @@ describe("Database Module", () => {
 
     const row2 = table.row(AnyStore.i32(0));
     expect(row2.get("name")).toBe("Bob");
+
+    row1.update("name", AnyStore.null());
+    expect(row1.get("name")).toBeNull();
   });
 
   test("insert and remove random data", async () => {
