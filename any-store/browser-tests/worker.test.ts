@@ -29,7 +29,7 @@ describe("Web Worker", async () => {
       });
 
       const row = table.row(AnyStore.i32(1));
-      row.update("counter", AnyStore.i32(0));
+      row.update("counter", 0);
       return row;
     });
 
@@ -38,7 +38,7 @@ describe("Web Worker", async () => {
     for (let i = 0; i < N; i++) {
       await db.withLockAsync(async () => {
         const current = row.get("counter") as number;
-        row.update("counter", AnyStore.i32(current + 1));
+        row.update("counter", current + 1);
       });
     }
 

@@ -1,7 +1,6 @@
 import { AnyStore } from "../src/WDB";
 import { describe, expect, test, vi } from "vitest";
 import fs from "fs";
-//mock fetch
 
 vi.stubGlobal(
   "fetch",
@@ -21,11 +20,13 @@ describe("Database Module", () => {
       data: "blob",
     });
     const k1 = AnyStore.i32(123);
-    table.insert(k1, AnyStore.string("Alice"), "name");
-    table.insert(k1, AnyStore.i32(30), "age");
-    table.insert(k1, AnyStore.f64(1.75), "height");
-    table.insert(k1, AnyStore.blob(new Uint8Array([1, 2, 3]))!, "data");
-    table.insert(AnyStore.i32(0), AnyStore.string("Bob"), "name");
+    const row = table.row(k1);
+    row.update("name", "Alice");
+    row.update("age", 30);
+    row.update("height", 1.75);
+    row.update("data", new Uint8Array([1, 2, 3]));
+    const row2 = table.row(AnyStore.i32(0));
+    row2.update("name", "Bob");
 
     const row1 = table.row(k1);
 
@@ -43,10 +44,10 @@ describe("Database Module", () => {
 
     expect(row1.get("name")).toBeNull();
 
-    const row2 = table.row(AnyStore.i32(0));
-    expect(row2.get("name")).toBe("Bob");
+    const row3 = table.row(AnyStore.i32(0));
+    expect(row3.get("name")).toBe("Bob");
 
-    row1.update("name", AnyStore.null());
+    row1.update("name", null);
     expect(row1.get("name")).toBeNull();
   });
 
@@ -78,9 +79,10 @@ describe("Database Module", () => {
       for (const table of tables) {
         mockData.forEach((item, index) => {
           const key = AnyStore.i32(index);
-          table.insert(key, AnyStore.string(item.name), "name");
-          table.insert(key, AnyStore.i32(item.age), "age");
-          table.insert(key, AnyStore.f64(item.height), "height");
+          const row = table.row(key);
+          row.update("name", item.name);
+          row.update("age", item.age);
+          row.update("height", item.height);
         });
 
         mockData.forEach((item, index) => {
@@ -122,7 +124,7 @@ describe("Database Module", () => {
     wdb.notifyAll();
     expect(fn).toHaveBeenCalledTimes(0);
 
-    row.update("counter", AnyStore.i32(0));
+    row.update("counter", 0);
 
     wdb.notifyAll();
     wdb.notifyAll(); //even if we notify multiple times, the listener should be called only once
@@ -130,7 +132,7 @@ describe("Database Module", () => {
 
     row.removeListener(listenerID);
 
-    row.update("counter", AnyStore.i32(1));
+    row.update("counter", 1);
 
     wdb.notifyAll();
     expect(fn).toHaveBeenCalledTimes(1);
@@ -147,7 +149,7 @@ describe("Database Module", () => {
 
     row.cached(fn);
     expect(row.get("counter")).toBeNull();
-    row.update("counter", AnyStore.i32(0));
+    row.update("counter", 0);
 
     expect(fn).toHaveBeenCalledTimes(0);
 
@@ -155,7 +157,7 @@ describe("Database Module", () => {
     expect(row.get("counter")).toBe(0);
     expect(fn).toHaveBeenCalledTimes(1);
 
-    row.update("counter", AnyStore.i32(1));
+    row.update("counter", 1);
 
     expect(row.get("counter")).toBe(0); // because we are observing row, we need to wait until it is notified
 
@@ -172,7 +174,7 @@ describe("Database Module", () => {
 
     const table = wdb.createTable("hello", { counter: "i32" });
     const firstRow = table.row(AnyStore.i32(1));
-    firstRow.update("counter", AnyStore.i32(10));
+    firstRow.update("counter", 10);
 
     const module = wdb.createWorker();
     const other = await AnyStore.fromModule(module);
@@ -185,7 +187,7 @@ describe("Database Module", () => {
     const otherRow = otherTable.row(AnyStore.i32(1));
     expect(otherRow.get("counter")).toBe(10);
 
-    otherRow.update("counter", AnyStore.i32(20));
+    otherRow.update("counter", 20);
     expect(firstRow.get("counter")).toBe(20);
   });
 
@@ -218,8 +220,9 @@ describe("Database Module", () => {
         mockData.forEach((item, index) => {
           const key = AnyStore.i32(index);
           // table.insert(key, AnyStore.string(item.name), "name");
-          table.insert(key, AnyStore.i32(item.age), "age");
-          table.insert(key, AnyStore.f64(item.height), "height");
+          const row = table.row(key);
+          row.update("age", item.age);
+          row.update("height", item.height);
         });
       }
 

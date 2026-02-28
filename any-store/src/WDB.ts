@@ -112,11 +112,6 @@ type WorkerData = {
   workerID: number;
 };
 
-// type SomethingWithTag<T> = Pick<Something, Extract<Something["tag"], T>>;
-
-type SomethingWithTag<T> = Extract<Something, { tag: T }>;
-type A = SomethingWithTag<"i32">; // { tag: "i32"; value: number }
-
 export class AnyStore {
   private ops: Ops;
   private listeners: Map<number, () => void> = new Map();
@@ -216,9 +211,9 @@ export class AnyStore {
 
   insertRowOnTable(tableID: number, key: Something, values: Something[]) {
     values.forEach((value) => {
-      this.ops.putSomethingOnStack(value);
+      this.ops.putSomethingOnStack(value.value, value.tag);
     });
-    this.ops.putSomethingOnStack(key);
+    this.ops.putSomethingOnStack(key.value, key.tag);
     this.ops.exports.table_insert_row(tableID);
   }
 
@@ -226,10 +221,11 @@ export class AnyStore {
     tableID: number,
     col: number,
     key: Something,
-    value: Something,
+    value: unknown,
+    tag: Something["tag"],
   ) {
-    this.ops.putSomethingOnStack(key);
-    this.ops.putSomethingOnStack(value);
+    this.ops.putSomethingOnStack(key.value, key.tag);
+    this.ops.putSomethingOnStack(value, tag);
     this.ops.tableInsert(tableID, col);
   }
 
@@ -254,14 +250,14 @@ export class AnyStore {
     key: Something,
     col: number,
   ): Something["value"] | null {
-    this.ops.putSomethingOnStack(key);
+    this.ops.putSomethingOnStack(key.value, key.tag);
     this.ops.tableGetSomething(tableID, col);
     const value = popObjectFromStack();
     return value ?? null;
   }
 
   deleteRowFromTable(tableID: number, key: Something) {
-    this.ops.putSomethingOnStack(key);
+    this.ops.putSomethingOnStack(key.value, key.tag);
     this.ops.deleteRowFromTable(tableID);
   }
 
@@ -271,7 +267,7 @@ export class AnyStore {
   }
 
   getRowFromTable(tableID: number, key: Something): Something["value"][] {
-    this.ops.putSomethingOnStack(key);
+    this.ops.putSomethingOnStack(key.value, key.tag);
     this.ops.getRowFromTable(tableID);
     return getWholeStack();
   }
@@ -335,13 +331,17 @@ type ValueMap = {
 export class Table<T extends ColMap> {
   colMap: Map<string, number> = new Map();
   constructor(
-    colMap: T,
+    private tags: T,
     private id: number,
     private wdb: AnyStore,
   ) {
-    Object.keys(colMap).forEach((colName, index) => {
+    Object.keys(tags).forEach((colName, index) => {
       this.colMap.set(colName, index);
     });
+  }
+
+  private tagOf(colName: keyof T): Something["tag"] {
+    return this.tags[colName];
   }
 
   addListenerToRow(key: Something, fn: () => void) {
@@ -352,9 +352,9 @@ export class Table<T extends ColMap> {
     return this.wdb.getRowFromTable(this.id, key);
   }
 
-  insert(key: Something, value: Something, colName: keyof T) {
+  _insert(key: Something, value: unknown, colName: keyof T) {
     const col = this.colMap.get(colName as string);
-    this.wdb.insertOnTable(this.id, col!, key, value);
+    this.wdb.insertOnTable(this.id, col!, key, value, this.tagOf(colName));
   }
 
   removeListenerFromRow(key: Something, listenerID: number) {
@@ -415,8 +415,8 @@ export class Row<T extends ColMap> {
     return this.table.deleteRow(this.key);
   }
 
-  update<K extends keyof T>(colName: K, value: SomethingWithTag<T[K]> | Null) {
-    this.table.insert(this.key, value, colName);
+  update<K extends keyof T>(colName: K, value: ValueMap[T[K]] | null) {
+    this.table._insert(this.key, value, colName);
   }
 
   removeListener(listenerID: number) {
@@ -449,32 +449,34 @@ class Ops {
   }
 
   createTable(name: string) {
-    this.putSomethingOnStack({ tag: "string", value: name });
+    this.putSomethingOnStack(name, "string");
     return this.exports.table_create();
   }
 
   getTableIDFromName(name: string): number | null {
-    this.putSomethingOnStack({ tag: "string", value: name });
+    this.putSomethingOnStack(name, "string");
     const id = this.exports.table_get_id_from_name();
     return id === -1 ? null : id;
   }
 
-  putSomethingOnStack(value: Something) {
-    if (value.tag === "i32") {
-      this.somethingPushi32ToStack(value.value);
-    } else if (value.tag === "string") {
-      this.pushStringToStack(value.value);
-    } else if (value.tag === "f64") {
-      this.somethingPushf64ToStack(value.value);
-    } else if (value.tag === "blob") {
-      this.somethingPushBlobToStack(value.value);
-    } else if (value.tag === "null") {
+  putSomethingOnStack(value: unknown, tag: Something["tag"]) {
+    if (value == null) {
+      this.pushNullToStack();
+    } else if (tag === "i32") {
+      this.somethingPushi32ToStack(value as number);
+    } else if (tag === "string") {
+      this.pushStringToStack(value as string);
+    } else if (tag === "f64") {
+      this.somethingPushf64ToStack(value as number);
+    } else if (tag === "blob") {
+      this.somethingPushBlobToStack(value as Uint8Array);
+    } else if (tag === "null") {
       this.pushNullToStack();
     }
   }
 
   removeListenerFromRow(tableID: number, key: Something, listenerID: number) {
-    this.putSomethingOnStack(key);
+    this.putSomethingOnStack(key, key.tag);
     this.exports.table_remove_listener(tableID, listenerID);
   }
 
@@ -513,7 +515,7 @@ class Ops {
   }
 
   addListenerToRow(tableID: number, key: Something): number {
-    this.putSomethingOnStack(key);
+    this.putSomethingOnStack(key.value, key.tag);
     return this.exports.table_add_listener_to_row(tableID);
   }
 

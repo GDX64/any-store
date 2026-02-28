@@ -93,9 +93,9 @@ describe("benchmarks inserts", async () => {
 describe("benchmarks selects", async () => {
   const mockData = Array.from({ length: 10_000 }, (_, i) => {
     return {
-      age: AnyStore.i32(Math.round(Math.random() * 100)),
-      height: AnyStore.f64(Math.random() * 2),
-      name: AnyStore.string("PETR4" + i),
+      age: Math.round(Math.random() * 100),
+      height: Math.random() * 2,
+      name: "PETR4" + i,
     };
   });
   const db = await AnyStore.create();
@@ -106,9 +106,11 @@ describe("benchmarks selects", async () => {
   });
   mockData.forEach((item, index) => {
     const key = AnyStore.i32(index);
-    table.insert(key, item.name, "name");
-    table.insert(key, item.age, "age");
-    table.insert(key, item.height, "height");
+    const row = table.row(key);
+
+    row.update("name", item.name);
+    row.update("age", item.age);
+    row.update("height", item.height);
   });
 
   const sqliteDB = new DatabaseSync(":memory:");
@@ -121,16 +123,16 @@ describe("benchmarks selects", async () => {
     `INSERT INTO test (id, name, age, height) VALUES (?, ?, ?, ?);`,
   );
   mockData.forEach((item, index) => {
-    stmt.run(index, item.name.value, item.age.value, item.height.value);
+    stmt.run(index, item.name, item.age, item.height);
   });
   sqliteDB.exec("COMMIT");
 
   const map = new Map<number, any>();
   mockData.forEach((item, index) => {
     map.set(index, {
-      name: item.name.value,
-      age: item.age.value,
-      height: item.height.value,
+      name: item.name,
+      age: item.age,
+      height: item.height,
     });
   });
 

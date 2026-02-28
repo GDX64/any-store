@@ -16,7 +16,7 @@ self.onmessage = async (event) => {
     for (let i = 0; i < n; i++) {
       db.withLock(() => {
         const current = row.get("counter") as number;
-        row.update("counter", AnyStore.i32(current + 1));
+        row.update("counter", current + 1);
       });
     }
     self.postMessage({
