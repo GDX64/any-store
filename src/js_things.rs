@@ -143,7 +143,7 @@ fn _table_get_something(table: usize, col: usize) -> Option<()> {
     let key = pop_from_something_stack()?;
     let something = GLOBALS.with_db_mut(|db| {
         let table = db.get_table(table)?;
-        return table.get(&key).and_then(|row| {
+        return table.get_row_by_key(&key).and_then(|row| {
             return Some(row.get(col).clone());
         });
     })??;
@@ -152,34 +152,30 @@ fn _table_get_something(table: usize, col: usize) -> Option<()> {
 }
 
 #[wasm_bindgen]
-pub fn table_get_row(table: usize) {
-    _table_get_row(table);
+pub fn table_get_row(table: usize, row_id: u32) {
+    _table_get_row(table, row_id);
 }
 
-fn _table_get_row(table: usize) -> Option<()> {
-    let key = pop_from_something_stack()?;
-    let row = GLOBALS.with_db_mut(|db| {
+fn _table_get_row(table: usize, row_id: u32) -> Option<()> {
+    return GLOBALS.with_db_mut(|db| {
         let table = db.get_table(table)?;
-        return table.get(&key).cloned();
-    })??;
-    for item in row.iter() {
-        add_something_to_js_stack(&item);
-    }
-    return Some(());
+        let row = table.get_row(row_id)?;
+        for item in row.iter() {
+            add_something_to_js_stack(&item);
+        }
+        return Some(());
+    })?;
 }
 
 #[wasm_bindgen]
-pub fn table_insert(table: usize, col: usize) {
+pub fn table_insert(table: usize, col: usize, row_id: u32) {
     let Some(value) = pop_from_something_stack() else {
-        return;
-    };
-    let Some(key) = pop_from_something_stack() else {
         return;
     };
     GLOBALS.with_db_mut(|db| {
         db.operation(Operation::Insert {
             table_id: table,
-            key,
+            row_id: row_id,
             value,
             index: col,
         });
@@ -206,6 +202,19 @@ pub fn something_push_string() {
 }
 
 #[wasm_bindgen]
+pub fn table_create_row(table: usize) -> i32 {
+    let row_id = GLOBALS
+        .with_db_mut(|db| {
+            let key = pop_from_something_stack()?;
+            let table = db.get_table_mut(table)?;
+            return Some(table.create_row(key) as i32);
+        })
+        .unwrap_or(None)
+        .unwrap_or(-1);
+    return row_id;
+}
+
+#[wasm_bindgen]
 pub fn something_push_f64_to_stack(value: f64) {
     let something = Something::Float(value);
     push_to_something_stack(something);
@@ -218,25 +227,16 @@ pub fn something_push_null_to_stack() {
 }
 
 #[wasm_bindgen]
-pub fn delete_row_from_table(table_id: usize) {
-    let Some(something) = pop_from_something_stack() else {
-        return;
-    };
+pub fn delete_row_from_table(table_id: usize, row_id: u32) {
     GLOBALS.with_db_mut(|db| {
-        db.operation(Operation::RowDelete {
-            table_id,
-            key: something,
-        });
+        db.operation(Operation::RowDelete { table_id, row_id });
     });
 }
 
 #[wasm_bindgen]
-pub fn table_remove_listener(table_id: usize, listener_id: u32) {
-    let Some(key) = pop_from_something_stack() else {
-        return;
-    };
+pub fn table_remove_listener(table_id: usize, listener_id: u32, row_id: u32) {
     GLOBALS.with_db_mut(|db| {
-        db.remove_listener(table_id, &key, listener_id);
+        db.remove_listener(table_id, row_id, listener_id);
     });
 }
 
@@ -254,15 +254,14 @@ pub fn db_take_notifications() {
 }
 
 #[wasm_bindgen]
-pub fn table_add_listener_to_row(table_id: usize) -> i32 {
-    fn inner(table_id: usize) -> Option<ListenerID> {
-        let something = pop_from_something_stack()?;
+pub fn table_add_listener_to_row(table_id: usize, row_id: u32) -> i32 {
+    fn inner(table_id: usize, row_id: u32) -> Option<ListenerID> {
         let id = GLOBALS.with_db_mut(|db| {
-            return db.add_listener_to(table_id, &something);
+            return db.add_listener_to(table_id, row_id);
         })?;
         return id;
     }
-    return inner(table_id).map(|id| id.to_i32()).unwrap_or(-1);
+    return inner(table_id, row_id).map(|id| id.to_i32()).unwrap_or(-1);
 }
 
 #[wasm_bindgen]

@@ -137,6 +137,11 @@ export class AnyStore {
     }
   }
 
+  createRow(key: Something, tableID: number): number {
+    this.ops.putSomethingOnStack(key.value, key.tag);
+    return this.ops.exports.table_create_row(tableID);
+  }
+
   /**
    * This function will probably be less performant than withLock
    * but it wont block the current thread in the case the lock
@@ -212,17 +217,16 @@ export class AnyStore {
   insertOnTable(
     tableID: number,
     col: number,
-    key: Something,
+    row_id: number,
     value: unknown,
     tag: Something["tag"],
   ) {
-    this.ops.putSomethingOnStack(key.value, key.tag);
     this.ops.putSomethingOnStack(value, tag);
-    this.ops.tableInsert(tableID, col);
+    this.ops.tableInsert(tableID, col, row_id);
   }
 
-  addListenerToRow(tableID: number, key: Something, fn: () => void) {
-    const result = this.ops.addListenerToRow(tableID, key);
+  addListenerToRow(tableID: number, rowID: number, fn: () => void) {
+    const result = this.ops.addListenerToRow(tableID, rowID);
     this.listeners.set(result, fn);
     return result;
   }
@@ -248,19 +252,17 @@ export class AnyStore {
     return value ?? null;
   }
 
-  deleteRowFromTable(tableID: number, key: Something) {
-    this.ops.putSomethingOnStack(key.value, key.tag);
-    this.ops.deleteRowFromTable(tableID);
+  deleteRowFromTable(tableID: number, rowID: number): void {
+    this.ops.deleteRowFromTable(tableID, rowID);
   }
 
-  removeListenerFromRow(tableID: number, key: Something, listenerID: number) {
+  removeListenerFromRow(tableID: number, rowID: number, listenerID: number) {
     this.listeners.delete(listenerID);
-    this.ops.removeListenerFromRow(tableID, key, listenerID);
+    this.ops.removeListenerFromRow(tableID, rowID, listenerID);
   }
 
-  getRowFromTable(tableID: number, key: Something): Something["value"][] {
-    this.ops.putSomethingOnStack(key.value, key.tag);
-    this.ops.getRowFromTable(tableID);
+  getRowFromTable(tableID: number, rowID: number): Something["value"][] {
+    this.ops.getRowFromTable(tableID, rowID);
     return getWholeStack();
   }
 
@@ -336,21 +338,21 @@ export class Table<T extends ColMap> {
     return this.tags[colName];
   }
 
-  addListenerToRow(key: Something, fn: () => void) {
-    return this.wdb.addListenerToRow(this.id, key, fn);
+  addListenerToRow(rowID: number, fn: () => void) {
+    return this.wdb.addListenerToRow(this.id, rowID, fn);
   }
 
-  getRow(key: Something): Something["value"][] {
-    return this.wdb.getRowFromTable(this.id, key);
+  getRow(rowID: number): Something["value"][] {
+    return this.wdb.getRowFromTable(this.id, rowID);
   }
 
-  _insert(key: Something, value: unknown, colName: keyof T) {
+  _insert(rowID: number, value: unknown, colName: keyof T) {
     const col = this.colMap.get(colName as string);
-    this.wdb.insertOnTable(this.id, col!, key, value, this.tagOf(colName));
+    this.wdb.insertOnTable(this.id, col!, rowID, value, this.tagOf(colName));
   }
 
-  removeListenerFromRow(key: Something, listenerID: number) {
-    this.wdb.removeListenerFromRow(this.id, key, listenerID);
+  removeListenerFromRow(listenerID: number, rowID: number) {
+    this.wdb.removeListenerFromRow(this.id, rowID, listenerID);
   }
 
   get(key: Something, colName: keyof T): Something["value"] | null {
@@ -358,12 +360,13 @@ export class Table<T extends ColMap> {
     return this.wdb.getFromTable(this.id, key, col!);
   }
 
-  deleteRow(key: Something) {
-    this.wdb.deleteRowFromTable(this.id, key);
+  deleteRow(rowID: number) {
+    this.wdb.deleteRowFromTable(this.id, rowID);
   }
 
   row(key: Something) {
-    return new Row<T>(this, key);
+    const id = this.wdb.createRow(key, this.id);
+    return new Row<T>(this, key, id);
   }
 }
 
@@ -373,6 +376,7 @@ export class Row<T extends ColMap> {
   constructor(
     private table: Table<T>,
     private key: Something,
+    private id: number = 0,
   ) {}
 
   get<K extends keyof T>(colName: K): ValueMap[T[K]] | null {
@@ -385,7 +389,7 @@ export class Row<T extends ColMap> {
   }
 
   private load() {
-    this.cache = this.table.getRow(this.key);
+    this.cache = this.table.getRow(this.id);
   }
 
   cached(onUpdate?: () => void) {
@@ -396,26 +400,26 @@ export class Row<T extends ColMap> {
   }
 
   addListener(fn: () => void) {
-    return this.table.addListenerToRow(this.key, fn);
+    return this.table.addListenerToRow(this.id, fn);
   }
 
   delete() {
-    return this.table.deleteRow(this.key);
+    return this.table.deleteRow(this.id);
   }
 
   update<K extends keyof T>(colName: K, value: ValueMap[T[K]] | null) {
-    this.table._insert(this.key, value, colName);
+    this.table._insert(this.id, value, colName);
   }
 
   removeListener(listenerID: number) {
-    this.table.removeListenerFromRow(this.key, listenerID);
+    this.table.removeListenerFromRow(listenerID, this.id);
   }
 
   getRow(): Something["value"][] {
     if (this.cache) {
       return this.cache;
     }
-    return this.table.getRow(this.key);
+    return this.table.getRow(this.id);
   }
 }
 
@@ -463,17 +467,16 @@ class Ops {
     }
   }
 
-  removeListenerFromRow(tableID: number, key: Something, listenerID: number) {
-    this.putSomethingOnStack(key, key.tag);
-    this.exports.table_remove_listener(tableID, listenerID);
+  removeListenerFromRow(tableID: number, rowID: number, listenerID: number) {
+    this.exports.table_remove_listener(tableID, listenerID, rowID);
   }
 
-  deleteRowFromTable(tableID: number): void {
-    this.exports.delete_row_from_table(tableID);
+  deleteRowFromTable(tableID: number, rowID: number): void {
+    this.exports.delete_row_from_table(tableID, rowID);
   }
 
-  getRowFromTable(tableID: number): void {
-    this.exports.table_get_row(tableID);
+  getRowFromTable(tableID: number, rowID: number): void {
+    this.exports.table_get_row(tableID, rowID);
   }
 
   pushNullToStack(): void {
@@ -502,9 +505,8 @@ class Ops {
     return getWholeStack();
   }
 
-  addListenerToRow(tableID: number, key: Something): number {
-    this.putSomethingOnStack(key.value, key.tag);
-    return this.exports.table_add_listener_to_row(tableID);
+  addListenerToRow(tableID: number, rowID: number): number {
+    return this.exports.table_add_listener_to_row(tableID, rowID);
   }
 
   somethingPushi32ToStack(value: number): void {
@@ -516,8 +518,8 @@ class Ops {
     this.exports.something_push_string();
   }
 
-  tableInsert(tableID: number, col: number): void {
-    this.exports.table_insert(tableID, col);
+  tableInsert(tableID: number, col: number, rowID: number): void {
+    this.exports.table_insert(tableID, col, rowID);
   }
 
   tableGetSomething(tableID: number, col: number): void {

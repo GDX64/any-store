@@ -28,13 +28,15 @@ impl ListenerID {
 pub struct Row {
     values: Vec<Something>,
     listeners: Option<Vec<ListenerID>>,
+    key: Something,
 }
 
 impl Row {
-    pub fn new() -> Self {
+    pub fn new(key: Something) -> Self {
         Row {
             values: Vec::new(),
             listeners: None,
+            key,
         }
     }
 
@@ -85,13 +87,13 @@ pub struct Database {
 pub enum Operation {
     Insert {
         table_id: usize,
-        key: Something,
+        row_id: u32,
         value: Something,
         index: usize,
     },
     RowDelete {
         table_id: usize,
-        key: Something,
+        row_id: u32,
     },
 }
 
@@ -125,17 +127,17 @@ impl Database {
         match op {
             Operation::Insert {
                 table_id,
-                key,
+                row_id,
                 value,
                 index,
             } => {
                 self.get_table_mut(table_id).map(|table| {
-                    return table.insert_at(key, value, index);
+                    return table.insert_at(row_id, value, index);
                 });
             }
-            Operation::RowDelete { table_id, key } => {
+            Operation::RowDelete { table_id, row_id } => {
                 self.get_table_mut(table_id).map(|table| {
-                    table.delete_row(&key);
+                    table.delete_row(row_id);
                 });
             }
         }
@@ -144,21 +146,21 @@ impl Database {
     pub fn remove_listener(
         &mut self,
         table_id: usize,
-        key: &Something,
+        row_id: u32,
         listener_id: u32,
     ) -> Option<()> {
         let listener_id = ListenerID::new(listener_id, worker_id() as u8);
         self.tables
             .get_mut(&table_id)?
-            .remove_listener(key, listener_id);
+            .remove_listener(row_id, listener_id);
         return Some(());
     }
 
-    pub fn add_listener_to(&mut self, table_id: usize, key: &Something) -> Option<ListenerID> {
+    pub fn add_listener_to(&mut self, table_id: usize, row_id: u32) -> Option<ListenerID> {
         let table = self.tables.get_mut(&table_id)?;
         let listener_id = ListenerID::new(self.next_listener_id, worker_id() as u8);
         self.next_listener_id += 1;
-        table.add_listener(listener_id, key)?;
+        table.add_listener(listener_id, row_id)?;
         return Some(listener_id);
     }
 
@@ -167,14 +169,14 @@ impl Database {
         let table_id = self.last_table_id;
         self.tables.insert(table_id, Table::new());
         self.tables.get_mut(&NAMES_TABLE_INDEX).map(|table| {
-            table.insert_at(name, Something::Int(table_id as i32), 0);
+            table.insert_at_by_key(&name, Something::Int(table_id as i32), 0);
         });
         return table_id;
     }
 
     pub fn get_table_id(&self, name: Something) -> Option<usize> {
         let table = self.tables.get(&NAMES_TABLE_INDEX)?;
-        let row = table.get(&name)?;
+        let row = table.get_row_by_key(&name)?;
         if let Something::Int(id) = row.get(0) {
             return Some(*id as usize);
         }
@@ -194,8 +196,10 @@ impl Database {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Table {
-    items: HashMap<Something, Row>,
+    items: HashMap<Something, u32>,
     notifications: Vec<ListenerID>,
+    rows: HashMap<u32, Row>,
+    last_row_id: u32,
 }
 
 impl Table {
@@ -203,11 +207,13 @@ impl Table {
         Table {
             items: HashMap::new(),
             notifications: Vec::new(),
+            rows: HashMap::new(),
+            last_row_id: 0,
         }
     }
 
-    pub fn remove_listener(&mut self, key: &Something, listener_id: ListenerID) -> Option<()> {
-        self.items.get_mut(key)?.remove_listener(listener_id);
+    pub fn remove_listener(&mut self, row_id: u32, listener_id: ListenerID) -> Option<()> {
+        self.rows.get_mut(&row_id)?.remove_listener(listener_id);
         return Some(());
     }
 
@@ -223,43 +229,65 @@ impl Table {
         return v;
     }
 
-    pub fn add_listener(&mut self, listener_id: ListenerID, key: &Something) -> Option<()> {
-        let row = self.items.entry(key.clone()).or_insert_with(Row::new);
+    pub fn add_listener(&mut self, listener_id: ListenerID, row_id: u32) -> Option<()> {
+        let row = self.rows.get_mut(&row_id)?;
         row.add_listener(listener_id);
         return Some(());
     }
 
-    pub fn delete_row(&mut self, key: &Something) {
-        self.items.remove(key);
+    pub fn delete_row(&mut self, row_id: u32) {
+        if let Some(v) = self.rows.remove(&row_id) {
+            v.notify(&mut self.notifications);
+            self.items.remove(&v.key);
+        }
     }
 
-    pub fn get(&self, key: &Something) -> Option<&Row> {
-        return self.items.get(key);
+    pub fn get_row(&self, row_id: u32) -> Option<&Row> {
+        return self.rows.get(&row_id);
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&Something, &Row)> {
-        self.items.iter()
+    pub fn get_row_by_key(&self, key: &Something) -> Option<&Row> {
+        let row_id = self.items.get(key)?;
+        return self.rows.get(row_id);
     }
 
-    pub fn insert_at(&mut self, key: Something, value: Something, index: usize) {
-        let e = self.items.entry(key);
-        let row = e.or_insert_with(Row::new);
+    pub fn create_row(&mut self, key: Something) -> u32 {
+        let row = self.items.get(&key);
+        if let Some(row) = row {
+            return *row;
+        }
+        self.last_row_id += 1;
+        let id = self.last_row_id;
+        self.items.insert(key.clone(), id);
+        let row = Row::new(key);
+        self.rows.insert(id, row);
+        return id;
+    }
+
+    pub fn insert_at(&mut self, row_id: u32, value: Something, index: usize) {
+        let Some(row) = self.rows.get_mut(&row_id) else {
+            return;
+        };
         row.insert_at(value, index);
         row.notify(&mut self.notifications);
     }
 
-    pub fn remove(&mut self, key: &Something) {
-        let row = self.items.remove(key);
-        if let Some(row) = row {
-            row.notify(&mut self.notifications);
+    pub fn insert_at_by_key(&mut self, key: &Something, value: Something, index: usize) {
+        let row_id = self.items.get(key);
+        if let Some(row_id) = row_id {
+            self.insert_at(*row_id, value, index);
+        } else {
+            self.create_row(key.clone());
+            let row_id = self.items.get(key).unwrap();
+            self.insert_at(*row_id, value, index);
         }
     }
 
-    pub fn rows_with<'a>(&'a self, f: impl Fn(&Row) -> bool + 'a) -> impl Iterator<Item = &'a Row> {
-        let iter = self.items.values().filter(move |k| {
-            return f(k);
-        });
-        return iter;
+    pub fn remove(&mut self, row_id: u32) {
+        let row = self.rows.remove(&row_id);
+        if let Some(row) = row {
+            row.notify(&mut self.notifications);
+        }
     }
 
     pub fn len(&self) -> usize {
