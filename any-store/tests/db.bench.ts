@@ -20,60 +20,47 @@ describe("benchmarks inserts", async () => {
     };
   });
   const db = await AnyStore.create();
+  const table = db.createTable("hello", {
+    name: "string",
+    age: "i32",
+    height: "f64",
+  });
 
-  bench(
-    "insert on db",
-    async () => {
-      try {
-        const table = db.createTable("hello", {
-          name: "string",
-          age: "i32",
-          height: "f64",
-        });
-        db.withLock(() => {
-          mockData.forEach((item, index) => {
-            const key = AnyStore.i32(index);
-            const row = table.row(key);
+  bench("insert on db", async () => {
+    try {
+      db.withLock(() => {
+        mockData.forEach((item, index) => {
+          const key = AnyStore.i32(index);
+          const row = table.row(key);
 
-            row.update("name", item.name);
-            row.update("age", item.age);
-            row.update("height", item.height);
-          });
+          row.update("name", item.name);
+          row.update("age", item.age);
+          row.update("height", item.height);
         });
-      } catch (e) {
-        console.error(e);
-      }
-    },
-    {
-      time: 100,
-    },
-  );
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  });
 
   const sqliteDB = new DatabaseSync(":memory:");
-  let count = 0;
-  bench(
-    "insert on sqlite",
-    () => {
-      count++;
-      const tableName = `test_${count}`;
-      sqliteDB.exec(`pragma journal_mode = WAL;`);
-      sqliteDB.exec(
-        `CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY, name TEXT, age INTEGER, height REAL);`,
-      );
-      // Wrap all inserts in a single transaction
-      sqliteDB.exec("BEGIN TRANSACTION");
-      const stmt = sqliteDB.prepare(
-        `INSERT INTO ${tableName} (id, name, age, height) VALUES (?, ?, ?, ?);`,
-      );
-      mockData.forEach((item, index) => {
-        stmt.run(index, item.name, item.age, item.height);
-      });
-      sqliteDB.exec("COMMIT");
-    },
-    {
-      time: 100,
-    },
+  const tableName = `test`;
+  sqliteDB.exec(`pragma journal_mode = WAL;`);
+  sqliteDB.exec(
+    `CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY, name TEXT, age INTEGER, height REAL);`,
   );
+
+  bench("insert on sqlite", () => {
+    // Wrap all inserts in a single transaction
+    sqliteDB.exec("BEGIN TRANSACTION");
+    const stmt = sqliteDB.prepare(
+      `INSERT OR REPLACE INTO ${tableName} (id, name, age, height) VALUES (?, ?, ?, ?);`,
+    );
+    mockData.forEach((item, index) => {
+      stmt.run(index, item.name, item.age, item.height);
+    });
+    sqliteDB.exec("COMMIT");
+  });
 });
 
 describe("benchmarks selects", async () => {
@@ -149,5 +136,30 @@ describe("benchmarks selects", async () => {
       const row = stmt.get(key);
       results.push(row);
     }
+  });
+});
+
+describe("benchmark counts", async () => {
+  const db = await AnyStore.create();
+  const table = db.createTable("counter", {
+    count: "i32",
+  });
+
+  bench("count on db", () => {
+    const row = table.row(AnyStore.i32(0));
+    row.update("count", 0);
+  });
+
+  const sqliteDB = new DatabaseSync(":memory:");
+  sqliteDB.exec(`pragma journal_mode = WAL;`);
+  sqliteDB.exec(`CREATE TABLE test (id INTEGER PRIMARY KEY, count INTEGER);`);
+  sqliteDB.exec(`INSERT INTO test (id, count) VALUES (0, 0);`);
+  const stmt = sqliteDB.prepare(`SELECT count FROM test WHERE id = 0;`);
+  const updateStmt = sqliteDB.prepare(
+    `UPDATE test SET count = ? WHERE id = 0;`,
+  );
+  bench("count on sqlite", () => {
+    const row = stmt.get();
+    updateStmt.run(Number(row?.count) + 1);
   });
 });
