@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
-    extern_functions::{self, *},
+    extern_functions::*,
     my_rwlock::MyRwLock,
     storage::{Database, ListenerID, Operation},
     value::Something,
