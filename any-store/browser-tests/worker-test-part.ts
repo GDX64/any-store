@@ -1,4 +1,4 @@
-import { AnyStore } from "../src/WDB";
+import { AnyStore } from "../src/AnyStore";
 
 self.onmessage = async (event) => {
   console.log("Message from main thread:", event.data);

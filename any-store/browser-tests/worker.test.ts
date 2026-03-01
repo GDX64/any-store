@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import Worker from "./worker-test-part?worker";
-import { AnyStore } from "../src/WDB";
+import { AnyStore } from "../src/AnyStore";
 
 describe("Web Worker", async () => {
   test("counter", async () => {

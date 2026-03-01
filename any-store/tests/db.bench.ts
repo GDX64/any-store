@@ -1,15 +1,9 @@
-import { bench, describe, vi } from "vitest";
-import { AnyStore } from "../src/WDB";
+import { bench, describe } from "vitest";
+import { AnyStore } from "../src/AnyStore";
 import { DatabaseSync } from "node:sqlite";
-import fs from "fs";
+import { setupFetch } from "./setupFetch";
 
-vi.stubGlobal(
-  "fetch",
-  vi.fn(async (url: URL) => {
-    const mod = fs.readFileSync(url.pathname.slice(1));
-    return mod;
-  }),
-);
+setupFetch();
 
 describe("benchmarks inserts", async () => {
   const mockData = Array.from({ length: 100 }, (_, i) => {

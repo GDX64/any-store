@@ -1,4 +1,4 @@
-import { AnyStore } from "../src/WDB";
+import { AnyStore } from "../src/AnyStore";
 import { describe, expect, test, vi } from "vitest";
 import { setupFetch } from "./setupFetch";
 
@@ -212,14 +212,14 @@ describe("Database Module", () => {
     p1.name = "Alice";
     p1.team = t1.rowID;
 
-    let rows = people.withColEquals("team", t1.rowID);
+    let rows = people.where("team", t1.rowID);
     expect(rows).toContain(p1.rowID);
 
     const p2 = people.row(AnyStore.i32(2));
     p2.name = "Bob";
     p2.team = t1.rowID;
 
-    rows = people.withColEquals("team", t1.rowID);
+    rows = people.where("team", t1.rowID);
     expect(rows).toContain(p1.rowID);
     expect(rows).toContain(p2.rowID);
   });

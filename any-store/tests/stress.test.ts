@@ -1,5 +1,5 @@
 import { setupFetch } from "./setupFetch";
-import { AnyStore } from "../src/WDB";
+import { AnyStore } from "../src/AnyStore";
 import { expect, test, describe } from "vitest";
 
 setupFetch();
