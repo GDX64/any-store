@@ -21,37 +21,52 @@ const table = db.createTable("users", {
   name: "string",
   age: "i32",
   height: "f64",
+  data: "blob",
 });
 
-// Get a row handle
+// Get a row handle with a key
 const row = table.row(AnyStore.i32(1));
 
-// Update values
-row.update("name", AnyStore.string("Alice"));
-row.update("age", AnyStore.i32(30));
-row.update("height", AnyStore.f64(1.75));
+// Update values (values are passed directly, not wrapped)
+row.update("name", "Alice");
+row.update("age", 30);
+row.update("height", 1.75);
+row.update("data", new Uint8Array([1, 2, 3]));
 
-// Read values
-console.log(row.get("name")); // "Alice"
-console.log(row.get("age")); // 30
-console.log(row.get("height")); // 1.75
+// Read values (fully type-safe)
+const name: string | null = row.get("name"); // "Alice"
+const age: number | null = row.get("age"); // 30
+const height: number | null = row.get("height"); // 1.75
+const data: Uint8Array | null = row.get("data"); // Uint8Array([1, 2, 3])
 
-// Delete a row
-row.delete();
+// Update with null to remove a value
+row.update("name", null);
 console.log(row.get("name")); // null
+
+// Delete the entire row
+row.delete();
+console.log(row.get("age")); // null
 ```
 
-## Data Types
+## Key Types
 
-The library supports the following data types:
+Keys must be created using these helper functions:
 
-- `AnyStore.i32(number)` - 32-bit integer
-- `AnyStore.f64(number)` - 64-bit float
-- `AnyStore.string(string)` - UTF-8 string
-- `AnyStore.blob(Uint8Array)` - Binary data
-- `AnyStore.null()` - Null value
+- `AnyStore.i32(number)` - 32-bit integer key
+- `AnyStore.f64(number)` - 64-bit float key
+- `AnyStore.string(string)` - String key
+- `AnyStore.blob(Uint8Array)` - Binary key
 
-## Table Operations
+## Column Types
+
+When defining table schemas, use these type names:
+
+- `"i32"` - 32-bit integer values
+- `"f64"` - 64-bit float values
+- `"string"` - UTF-8 string values
+- `"blob"` - Binary data (Uint8Array) values
+
+## Working with Rows
 
 ```ts
 const table = db.createTable("products", {
@@ -60,33 +75,27 @@ const table = db.createTable("products", {
   stock: "i32",
 });
 
-// Insert individual columns
-const key = AnyStore.i32(1);
-table.insert(key, AnyStore.string("Laptop"), "name");
-table.insert(key, AnyStore.f64(999.99), "price");
-table.insert(key, AnyStore.i32(5), "stock");
+// Create a row handle
+const row = table.row(AnyStore.i32(1));
 
-// Insert a complete row at once
-table.insertRow(
-  AnyStore.i32(2),
-  [
-    AnyStore.string("Mouse"),
-    AnyStore.f64(29.99),
-    AnyStore.i32(100),
-  ]
-);
+// Update individual columns
+row.update("name", "Laptop");
+row.update("price", 999.99);
+row.update("stock", 5);
 
-// Get a single value
-const price = table.get(key, "price"); // 999.99
+// Get individual values
+const price = row.get("price"); // 999.99
 
-// Get the entire row
-const row = table.getRow(key); // ["Laptop", 999.99, 5]
+// Get the entire row as an array
+const rowData = row.getRow(); // ["Laptop", 999.99, 5]
 
-// Delete a row
-table.deleteRow(key);
+// Delete the row
+row.delete();
 ```
 
 ## Reactive Updates with Listeners
+
+Listen to row changes for reactive updates:
 
 ```ts
 const table = db.createTable("counter", { value: "i32" });
@@ -97,19 +106,25 @@ const listenerID = row.addListener(() => {
   console.log("Row changed:", row.get("value"));
 });
 
-// Update triggers the listener on next notifyAll()
-row.update("value", AnyStore.i32(10));
-db.notifyAll(); // Triggers all listeners
+// Listeners are not called immediately after updates
+row.update("value", 10);
 
-// Remove the listener
+// Listeners trigger only when notifyAll() is called
+db.notifyAll(); // Triggers all pending listener notifications
+
+// Multiple notifyAll() calls only trigger each listener once per change
+db.notifyAll(); // Listeners won't fire again unless row changes
+
+// Remove the listener when done
 row.removeListener(listenerID);
 ```
 
-## Cached Rows
+## Cached Rows for Performance
 
-Use cached rows for better performance when reading values frequently:
+Enable caching on a row to avoid reading from the database on every access:
 
 ```ts
+const table = db.createTable("counter", { value: "i32" });
 const row = table.row(AnyStore.i32(1));
 
 // Enable caching with optional update callback
@@ -117,11 +132,25 @@ row.cached(() => {
   console.log("Cache updated:", row.get("value"));
 });
 
-row.update("value", AnyStore.i32(10));
-console.log(row.get("value")); // Still old value until notified
+// First read returns null (no data yet)
+console.log(row.get("value")); // null
 
-db.notifyAll(); // Updates cache and triggers callback
-console.log(row.get("value")); // 10 (from cache)
+row.update("value", 0);
+
+// Cache is not updated immediately
+console.log(row.get("value")); // null (still using cached value)
+
+// Notify to update the cache
+db.notifyAll(); // Triggers callback and updates cache
+console.log(row.get("value")); // 0 (from cache)
+
+row.update("value", 1);
+
+// Cache still shows old value until notified
+console.log(row.get("value")); // 0
+
+db.notifyAll(); // Updates cache again
+console.log(row.get("value")); // 1
 ```
 
 ## Usage with Workers
@@ -132,11 +161,11 @@ Share the database across multiple threads without serialization:
 // Main thread
 import { AnyStore } from "@glmachado/any-store";
 
-const db = await AnyStore.create(0); // Worker ID 0 for main thread
+const db = await AnyStore.create();
 const table = db.createTable("shared", { counter: "i32" });
 
 const row = table.row(AnyStore.i32(1));
-row.update("counter", AnyStore.i32(0));
+row.update("counter", 0);
 
 // Create worker data to share
 const workerData = db.createWorker();
@@ -163,20 +192,28 @@ self.onmessage = async (event) => {
   
   // Read and modify shared data
   db.withLock(() => {
-    const current = row.get("counter") as number;
-    row.update("counter", AnyStore.i32(current + 1));
+    const current = row.get("counter") ?? 0;
+    row.update("counter", current + 1);
   });
 };
 ```
 
 ## Thread Safety
 
-Use `withLock()` to ensure atomic operations when accessing shared data:
+When working with workers, use `withLock()` to ensure atomic operations:
 
 ```ts
+// Synchronous lock - blocks in workers (uses Atomics.wait)
+// Spins in main thread (cannot use Atomics.wait)
 db.withLock(() => {
-  const current = row.get("counter") as number;
-  row.update("counter", AnyStore.i32(current + 1));
+  const current = row.get("counter") ?? 0;
+  row.update("counter", current + 1);
+});
+
+// Async lock - doesn't block main thread
+await db.withLockAsync(async () => {
+  const current = row.get("counter") ?? 0;
+  row.update("counter", current + 1);
 });
 ```
 
@@ -184,32 +221,45 @@ db.withLock(() => {
 
 ### AnyStore
 
-- `static create(id?: number, bufferSource?: BufferSource): Promise<AnyStore>` - Create a new database
-- `static fromModule(workerData: WorkerData): Promise<AnyStore>` - Create from worker data
-- `createTable<T>(name: string, colMap: T): Table<T>` - Create a new table
-- `getTable<T>(name: string, colMap: T): Table<T> | null` - Get an existing table by name
-- `createWorker(): WorkerData` - Create worker data for sharing
-- `withLock<T>(fn: () => T): T` - Execute function with lock
-- `notifyAll(): void` - Notify all listeners
-- `memSize(): number` - Get memory size in pages
+**Static Methods**
+- `static create(): Promise<AnyStore>` - Create a new database instance
+- `static fromModule(workerData: WorkerData): Promise<AnyStore>` - Create database from worker data
+- `static i32(value: number): Something` - Create an i32 key/value
+- `static f64(value: number): Something` - Create an f64 key/value
+- `static string(value: string): Something` - Create a string key/value
+- `static blob(value: Uint8Array): Something` - Create a blob key/value
+- `static null(): Something` - Create a null value
 
-### Table
+**Instance Methods**
+- `createTable<T>(name: string, colMap: T): Table<T>` - Create a new table with schema
+- `getTable<T>(name: string, colMap: T): Table<T> | null` - Get existing table by name
+- `createWorker(): WorkerData` - Create worker data for sharing across threads
+- `withLock<T>(fn: () => T): T` - Execute function with exclusive lock (blocks in workers)
+- `withLockAsync<T>(fn: () => Promise<T>): Promise<T>` - Execute function with exclusive lock (async)
+- `notifyAll(): void` - Trigger all pending listener notifications
+- `memSize(): number` - Get current memory size
 
-- `row(key: Something): Row` - Get a row handle
-- `insert(key: Something, value: Something, colName: string): void` - Insert a value
-- `insertRow(key: Something, values: Something[]): void` - Insert a complete row
-- `get(key: Something, colName: string): any` - Get a value
-- `getRow(key: Something): any[]` - Get all values in a row
-- `deleteRow(key: Something): void` - Delete a row
-- `addListenerToRow(key: Something, fn: () => void): number` - Add a listener
-- `removeListenerFromRow(key: Something, listenerID: number): void` - Remove a listener
+### Table<T>
 
-### Row
+- `row(key: Something): Row<T>` - Get or create a row handle with the given key
+- `get(rowID: number, colName: keyof T): any | null` - Get a value directly (internal use)
+- `getRow(rowID: number): any[]` - Get entire row as array (internal use)
+- `deleteRow(rowID: number): void` - Delete a row (internal use)
+- `addListenerToRow(rowID: number, fn: () => void): number` - Add listener (internal use)
+- `removeListenerFromRow(listenerID: number, rowID: number): void` - Remove listener (internal use)
 
-- `get(colName: string): any` - Get a column value
-- `update(colName: string, value: Something): void` - Update a column
-- `delete(): void` - Delete the row
-- `getRow(): any[]` - Get all values
-- `addListener(fn: () => void): number` - Add a listener
-- `cached(onUpdate?: () => void): number` - Enable caching
-- `removeListener(listenerID: number): void` - Remove a listener
+**Note:** Most table operations should be done through `Row` objects rather than directly on the table.
+
+### Row<T>
+
+**Properties**
+- `key: Something` - The row's key (readonly)
+
+**Methods**
+- `get<K extends keyof T>(colName: K): ValueType | null` - Get column value (type-safe)
+- `update<K extends keyof T>(colName: K, value: ValueType | null): void` - Update column value
+- `getRow(): any[]` - Get entire row as array in schema order
+- `delete(): void` - Delete the entire row
+- `addListener(fn: () => void): number` - Add listener, returns listener ID
+- `removeListener(listenerID: number): void` - Remove listener by ID
+- `cached(onUpdate?: () => void): number` - Enable caching mode with optional callback
