@@ -30,37 +30,19 @@ describe("benchmarks inserts", async () => {
           age: "i32",
           height: "f64",
         });
-        mockData.forEach((item, index) => {
-          const key = AnyStore.i32(index);
-          const row = table.row(key);
+        db.withLock(() => {
+          mockData.forEach((item, index) => {
+            const key = AnyStore.i32(index);
+            const row = table.row(key);
 
-          row.update("name", item.name);
-          row.update("age", item.age);
-          row.update("height", item.height);
+            row.update("name", item.name);
+            row.update("age", item.age);
+            row.update("height", item.height);
+          });
         });
       } catch (e) {
         console.error(e);
       }
-    },
-    {
-      time: 100,
-    },
-  );
-
-  bench(
-    "insert on hashmap",
-    () => {
-      const map = new Map<number, any>();
-      mockData.forEach((item, index) => {
-        map.set(
-          index,
-          structuredClone({
-            name: item.name,
-            age: item.age,
-            height: item.height,
-          }),
-        );
-      });
     },
     {
       time: 100,
@@ -143,22 +125,14 @@ describe("benchmarks selects", async () => {
   bench("select on db", () => {
     const N = 1000;
     const results: any = [];
-    for (let i = 0; i < N; i++) {
-      const key = AnyStore.i32(Math.floor(Math.random() * 10_000));
-      const row = table.row(key);
-      const rowData = row.getRow();
-      results.push(rowData);
-    }
-  });
-
-  bench("select on hashmap", () => {
-    const N = 1000;
-    const results: any = [];
-    for (let i = 0; i < N; i++) {
-      const key = Math.floor(Math.random() * 10_000);
-      const row = map.get(key);
-      results.push(structuredClone(row));
-    }
+    db.withLock(() => {
+      for (let i = 0; i < N; i++) {
+        const key = AnyStore.i32(Math.floor(Math.random() * 10_000));
+        const row = table.row(key);
+        const rowData = row.getRow();
+        results.push(rowData);
+      }
+    });
   });
 
   bench("select on sqlite", () => {
