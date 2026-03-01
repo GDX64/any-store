@@ -122,14 +122,17 @@ describe("benchmarks selects", async () => {
     });
   });
 
+  const N = 1000;
+  const rows = [...Array(N)].map(() => {
+    const key = AnyStore.i32(Math.floor(Math.random() * 10_000));
+    return table.row(key);
+  });
+
   bench("select on db", () => {
-    const N = 1000;
     const results: any = [];
     db.withLock(() => {
       for (let i = 0; i < N; i++) {
-        const key = AnyStore.i32(Math.floor(Math.random() * 10_000));
-        const row = table.row(key);
-        const rowData = row.getRow();
+        const rowData = rows[i].getRow();
         results.push(rowData);
       }
     });
