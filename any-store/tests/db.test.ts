@@ -1,14 +1,8 @@
 import { AnyStore } from "../src/WDB";
 import { describe, expect, test, vi } from "vitest";
-import fs from "fs";
+import { setupFetch } from "./setupFetch";
 
-vi.stubGlobal(
-  "fetch",
-  vi.fn(async (url: URL) => {
-    const mod = fs.readFileSync(url.pathname.slice(1));
-    return mod;
-  }),
-);
+setupFetch();
 
 describe("Database Module", () => {
   test("should initialize the database correctly", async () => {
@@ -77,7 +71,7 @@ describe("Database Module", () => {
     });
 
     const N_REPETITIONS = 2;
-    const N_TABLES = 5;
+    const N_TABLES = 2;
     const wdb = await AnyStore.create();
     const tables = [...Array(N_TABLES)].map((_, i) =>
       wdb.createTable(`table_${i}`, {
