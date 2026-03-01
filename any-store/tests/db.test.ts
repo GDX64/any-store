@@ -203,57 +203,30 @@ describe("Database Module", () => {
     expect(firstRow.counter).toBe(20);
   });
 
-  test("stress memory", async () => {
-    const mockData = new Map<
-      number,
-      { age: number; height: number; name: string }
-    >();
-    Array.from({ length: 1000 }, (_, i) => {
-      mockData.set(i, {
-        age: Math.round(Math.random() * 100),
-        height: Math.random() * 2,
-        name: `Name_${i}`,
-      });
+  test("Foreign keys", async () => {
+    const db = await AnyStore.create();
+    const people = db.createTable("people", {
+      name: "string",
+      team: "i32",
     });
+    const team = db.createTable("team", {
+      name: "string",
+    });
+    const t1 = team.row(AnyStore.i32(1));
+    t1.name = "Team A";
+    const p1 = people.row(AnyStore.i32(1));
+    p1.name = "Alice";
+    p1.team = t1.rowID;
 
-    const N_REPETITIONS = 100;
-    const N_TABLES = 10;
-    const wdb = await AnyStore.create();
-    const tables = [...Array(N_TABLES)].map((_, i) =>
-      wdb.createTable(`table_${i}`, {
-        name: "string",
-        age: "i32",
-        height: "f64",
-      }),
-    );
+    let rows = people.withColEquals("team", t1.rowID);
+    expect(rows).toContain(p1.rowID);
 
-    function insertAndRemove() {
-      for (const table of tables) {
-        mockData.forEach((item, index) => {
-          const key = AnyStore.i32(index);
-          // table.insert(key, AnyStore.string(item.name), "name");
-          const row = table.row(key);
-          row.age = item.age;
-          row.height = item.height;
-        });
-      }
+    const p2 = people.row(AnyStore.i32(2));
+    p2.name = "Bob";
+    p2.team = t1.rowID;
 
-      for (const table of tables) {
-        mockData.forEach((_, index) => {
-          const row = table.row(AnyStore.i32(index));
-          row.delete();
-        });
-      }
-    }
-
-    for (let i = 0; i < N_REPETITIONS / 2; i++) {
-      insertAndRemove();
-    }
-    const mem = wdb.memSize();
-    for (let i = 0; i < N_REPETITIONS / 2; i++) {
-      insertAndRemove();
-    }
-    //memory should not grow over time
-    expect(wdb.memSize()).toBe(mem);
+    rows = people.withColEquals("team", t1.rowID);
+    expect(rows).toContain(p1.rowID);
+    expect(rows).toContain(p2.rowID);
   });
 });

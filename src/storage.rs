@@ -227,6 +227,20 @@ impl Table {
         return v;
     }
 
+    pub fn with_cols_equal_to(&self, col: usize, value: Something) -> Vec<u32> {
+        return self
+            .rows
+            .iter()
+            .filter_map(|(row_id, row)| {
+                let something = row.get(col);
+                if something == &value {
+                    return Some(row_id);
+                }
+                return None;
+            })
+            .collect::<Vec<u32>>();
+    }
+
     pub fn add_listener(&mut self, listener_id: ListenerID, row_id: u32) -> Option<()> {
         let row = self.rows.get_mut(&row_id)?;
         row.add_listener(listener_id);
@@ -323,5 +337,9 @@ impl RowsCollection {
 
     pub fn remove(&mut self, id: &u32) -> Option<Row> {
         return self.rows.remove(id);
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (u32, &Row)> {
+        return self.rows.iter().map(|(id, row)| (*id, row));
     }
 }

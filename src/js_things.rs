@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
-    extern_functions::*,
+    extern_functions::{self, *},
     my_rwlock::MyRwLock,
     storage::{Database, ListenerID, Operation},
     value::Something,
@@ -36,10 +36,6 @@ fn pop_something() -> Option<Something> {
 
 fn push_something(value: Something) {
     SOMETHING_STACK.with(|stack| stack.borrow_mut().push(value));
-}
-
-fn push_to_something_stack(value: Something) {
-    push_something(value);
 }
 
 fn pop_from_something_stack() -> Option<Something> {
@@ -143,7 +139,7 @@ fn _table_get_something(table: usize, col: usize, row_id: u32) -> Option<()> {
     return GLOBALS.with_db_mut(|db| {
         let table = db.get_table(table)?;
         let row = table.get_row(row_id)?;
-        add_something_to_js_stack(row.get(col));
+        push_to_js_stack(row.get(col));
         return Some(());
     })?;
 }
@@ -158,7 +154,7 @@ fn _table_get_row(table: usize, row_id: u32) -> Option<()> {
         let table = db.get_table(table)?;
         let row = table.get_row(row_id)?;
         for item in row.iter() {
-            add_something_to_js_stack(&item);
+            push_to_js_stack(&item);
         }
         return Some(());
     })?;
@@ -182,7 +178,7 @@ pub fn table_insert(table: usize, col: usize, row_id: u32) {
 #[wasm_bindgen]
 pub fn something_push_i32_to_stack(value: i32) {
     let something = Something::Int(value);
-    push_to_something_stack(something);
+    push_something(something);
 }
 
 #[wasm_bindgen]
@@ -195,7 +191,7 @@ pub fn something_push_string() {
     }
     safe_js_pop_stack();
     let something = Something::String(bytes);
-    push_to_something_stack(something);
+    push_something(something);
 }
 
 #[wasm_bindgen]
@@ -212,15 +208,28 @@ pub fn table_create_row(table: usize) -> i32 {
 }
 
 #[wasm_bindgen]
+pub fn table_with_col_equals(table: usize, col: usize) {
+    GLOBALS.with_db_mut(|db| {
+        let value = pop_from_something_stack()?;
+        let table = db.get_table(table)?;
+        let rows = table.with_cols_equal_to(col, value);
+        for row_id in rows {
+            push_to_js_stack(&Something::Int(row_id as i32));
+        }
+        return Some(());
+    });
+}
+
+#[wasm_bindgen]
 pub fn something_push_f64_to_stack(value: f64) {
     let something = Something::Float(value);
-    push_to_something_stack(something);
+    push_something(something);
 }
 
 #[wasm_bindgen]
 pub fn something_push_null_to_stack() {
     let something = Something::Null;
-    push_to_something_stack(something);
+    push_something(something);
 }
 
 #[wasm_bindgen]
@@ -271,10 +280,10 @@ pub fn something_push_blob() {
     }
     safe_js_pop_stack();
     let something = Something::Blob(bytes);
-    push_to_something_stack(something);
+    push_something(something);
 }
 
-fn add_something_to_js_stack(value: &Something) {
+fn push_to_js_stack(value: &Something) {
     match value {
         Something::Int(v) => {
             safe_put_i32(*v);

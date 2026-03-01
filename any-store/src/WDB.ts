@@ -197,6 +197,17 @@ export class AnyStore {
     return new AnyStore(mod, workerData.memory);
   }
 
+  withColsEqual(
+    tableID: number,
+    col: number,
+    value: unknown,
+    tag: Something["tag"],
+  ): number[] {
+    this.ops.putSomethingOnStack(value, tag);
+    this.ops.exports.table_with_col_equals(tableID, col);
+    return getWholeStack();
+  }
+
   getTable<T extends ColMap>(name: string, colMap: T): Table<T> | null {
     const id = this.ops.getTableIDFromName(name);
     if (!id) {
@@ -326,7 +337,7 @@ export class Table<T extends ColMap> {
   private rowConstructor: typeof _Row;
   constructor(
     private tags: T,
-    private id: number,
+    private tableID: number,
     private wdb: AnyStore,
   ) {
     Object.keys(tags).forEach((colName, index) => {
@@ -341,7 +352,7 @@ export class Table<T extends ColMap> {
       const set: any = new Function(
         "value",
         `
-        this.table._insert(this.id, value, "${col}", "${tag}");
+        this.table._insert(this.rowID, value, "${col}", "${tag}");
         return value;
         `,
       );
@@ -351,7 +362,7 @@ export class Table<T extends ColMap> {
           if(this.cache) {
             return this.cache[${colIndex}];
           }
-          return this.table.wdb.getFromTable(this.table.id, this.id, ${colIndex});
+          return this.table.wdb.getFromTable(this.table.tableID, this.rowID, ${colIndex});
         }`);
 
       Object.defineProperties(ThisRow.prototype as any, {
@@ -372,34 +383,52 @@ export class Table<T extends ColMap> {
   }
 
   addListenerToRow(rowID: number, fn: () => void) {
-    return this.wdb.addListenerToRow(this.id, rowID, fn);
+    return this.wdb.addListenerToRow(this.tableID, rowID, fn);
   }
 
   getRow(rowID: number): Something["value"][] {
-    return this.wdb.getRowFromTable(this.id, rowID);
+    return this.wdb.getRowFromTable(this.tableID, rowID);
   }
 
   _insert(rowID: number, value: unknown, colName: keyof T) {
     const col = this.colMap.get(colName as string);
-    this.wdb.insertOnTable(this.id, col!, rowID, value, this.tagOf(colName));
+    this.wdb.insertOnTable(
+      this.tableID,
+      col!,
+      rowID,
+      value,
+      this.tagOf(colName),
+    );
   }
 
   removeListenerFromRow(listenerID: number, rowID: number) {
-    this.wdb.removeListenerFromRow(this.id, rowID, listenerID);
+    this.wdb.removeListenerFromRow(this.tableID, rowID, listenerID);
   }
 
   get(rowID: number, colName: keyof T): Something["value"] | null {
     const col = this.colMap.get(colName as string);
-    return this.wdb.getFromTable(this.id, rowID, col!);
+    return this.wdb.getFromTable(this.tableID, rowID, col!);
   }
 
   deleteRow(rowID: number) {
-    this.wdb.deleteRowFromTable(this.id, rowID);
+    this.wdb.deleteRowFromTable(this.tableID, rowID);
   }
 
   row(key: Something) {
-    const id = this.wdb.createRow(key, this.id);
+    const id = this.wdb.createRow(key, this.tableID);
     return new this.rowConstructor<T>(this, id, key) as Row<T>;
+  }
+
+  withColEquals<K extends keyof T>(
+    colName: K,
+    value: ValueMap[T[K]],
+  ): number[] {
+    return this.wdb.withColsEqual(
+      this.tableID,
+      this.colMap.get(colName as string)!,
+      value,
+      this.tagOf(colName),
+    );
   }
 }
 
@@ -412,12 +441,12 @@ export class _Row<T extends ColMap> {
 
   constructor(
     private table: Table<T>,
-    private id: number = 0,
-    public readonly key: Something,
+    public rowID: number = 0,
+    public readonly rowKey: Something,
   ) {}
 
   private load() {
-    this.cache = this.table.getRow(this.id);
+    this.cache = this.table.getRow(this.rowID);
   }
 
   cached(onUpdate?: () => void) {
@@ -428,22 +457,22 @@ export class _Row<T extends ColMap> {
   }
 
   addListener(fn: () => void) {
-    return this.table.addListenerToRow(this.id, fn);
+    return this.table.addListenerToRow(this.rowID, fn);
   }
 
   delete() {
-    return this.table.deleteRow(this.id);
+    return this.table.deleteRow(this.rowID);
   }
 
   removeListener(listenerID: number) {
-    this.table.removeListenerFromRow(listenerID, this.id);
+    this.table.removeListenerFromRow(listenerID, this.rowID);
   }
 
   getRow(): Something["value"][] {
     if (this.cache) {
       return this.cache;
     }
-    return this.table.getRow(this.id);
+    return this.table.getRow(this.rowID);
   }
 }
 
