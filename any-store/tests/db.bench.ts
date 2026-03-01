@@ -145,9 +145,10 @@ describe("benchmark counts", async () => {
     count: "i32",
   });
 
+  const row = table.row(AnyStore.i32(0));
   bench("count on db", () => {
-    const row = table.row(AnyStore.i32(0));
-    row.update("count", 0);
+    const current = row.get("count") ?? 0;
+    row.update("count", current + 1);
   });
 
   const sqliteDB = new DatabaseSync(":memory:");
