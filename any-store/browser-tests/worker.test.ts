@@ -29,7 +29,7 @@ describe("Web Worker", async () => {
       });
 
       const row = table.row(AnyStore.i32(1));
-      row.update("counter", 0);
+      row.counter = 0;
       return row;
     });
 
@@ -37,8 +37,8 @@ describe("Web Worker", async () => {
 
     for (let i = 0; i < N; i++) {
       await db.withLockAsync(async () => {
-        const current = row.get("counter") as number;
-        row.update("counter", current + 1);
+        const current = row.counter ?? 0;
+        row.counter = current + 1;
       });
     }
 
@@ -50,6 +50,6 @@ describe("Web Worker", async () => {
       throw new Error("One of the workers failed");
     }
 
-    expect(row.get("counter")).toBe(N * (allFinished.length + 1));
+    expect(row.counter).toBe(N * (allFinished.length + 1));
   });
 });

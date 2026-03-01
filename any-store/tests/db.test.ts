@@ -21,34 +21,29 @@ describe("Database Module", () => {
     });
     const k1 = AnyStore.i32(123);
     const row = table.row(k1);
-    row.name("Alice");
-    row.age(30);
-    row.height(1.75);
-    row.data(new Uint8Array([1, 2, 3]));
+    row.name = "Alice";
+    row.age = 30;
+    row.height = 1.75;
+    row.data = new Uint8Array([1, 2, 3]);
     const row2 = table.row(AnyStore.i32(0));
-    row2.name("Bob");
+    row2.name = "Bob";
 
     const row1 = table.row(k1);
+    const { name, age, height, data } = row1;
 
-    //assert types
-    const name1: string | null = row1.name();
-    const age1: number | null = row1.age();
-    const height1: number | null = row1.height();
-    const data1: Uint8Array | null = row1.data();
-
-    expect(name1).toBe("Alice");
-    expect(age1).toBe(30);
-    expect(height1).toBeCloseTo(1.75);
-    expect(data1).toEqual(new Uint8Array([1, 2, 3]));
+    expect(name).toBe("Alice");
+    expect(age).toBe(30);
+    expect(height).toBeCloseTo(1.75);
+    expect(data).toEqual(new Uint8Array([1, 2, 3]));
     row1.delete();
 
-    expect(row1.name()).toBeNull();
+    expect(row1.name).toBeNull();
 
     const row3 = table.row(AnyStore.i32(0));
-    expect(row3.name()).toBe("Bob");
+    expect(row3.name).toBe("Bob");
 
-    row1.name(null);
-    expect(row1.name()).toBeNull();
+    row1.name = null;
+    expect(row1.name).toBeNull();
   });
 
   test("using accessors", async () => {
@@ -59,11 +54,11 @@ describe("Database Module", () => {
     });
     const k1 = AnyStore.i32(123);
     const row = table.row(k1);
-    row.name("Alice");
-    row.age(30);
+    row.name = "Alice";
+    row.age = 30;
 
-    expect(row.name()).toBe("Alice");
-    expect(row.age()).toBe(30);
+    expect(row.name).toBe("Alice");
+    expect(row.age).toBe(30);
   });
 
   test("insert and remove random data", async () => {
@@ -95,9 +90,9 @@ describe("Database Module", () => {
         mockData.forEach((item, index) => {
           const key = AnyStore.i32(index);
           const row = table.row(key);
-          row.name(item.name);
-          row.age(item.age);
-          row.height(item.height);
+          row.name = item.name;
+          row.age = item.age;
+          row.height = item.height;
         });
 
         mockData.forEach((item, index) => {
@@ -107,18 +102,18 @@ describe("Database Module", () => {
           expect(rowData[0]).toBe(item.name);
           expect(rowData[1]).toBe(item.age);
           expect(rowData[2]).toBeCloseTo(item.height);
-          const name = row.name();
-          const age = row.age();
-          const height = row.height();
+          const name = row.name;
+          const age = row.age;
+          const height = row.height;
           expect(name).toBe(item.name);
           expect(age).toBe(item.age);
           expect(height).toBeCloseTo(item.height);
 
           row.delete();
 
-          expect(row.name()).toBeNull();
-          expect(row.age()).toBeNull();
-          expect(row.height()).toBeNull();
+          expect(row.name).toBeNull();
+          expect(row.age).toBeNull();
+          expect(row.height).toBeNull();
         });
       }
     }
@@ -139,7 +134,7 @@ describe("Database Module", () => {
     wdb.notifyAll();
     expect(fn).toHaveBeenCalledTimes(0);
 
-    row.counter(0);
+    row.counter = 0;
 
     wdb.notifyAll();
     wdb.notifyAll(); //even if we notify multiple times, the listener should be called only once
@@ -147,7 +142,7 @@ describe("Database Module", () => {
 
     row.removeListener(listenerID);
 
-    row.counter(1);
+    row.counter = 1;
 
     wdb.notifyAll();
     expect(fn).toHaveBeenCalledTimes(1);
@@ -163,22 +158,22 @@ describe("Database Module", () => {
     const fn = vi.fn();
 
     row.cached(fn);
-    expect(row.counter()).toBeNull();
-    row.counter(0);
+    expect(row.counter).toBeNull();
+    row.counter = 0;
 
     expect(fn).toHaveBeenCalledTimes(0);
 
     wdb.notifyAll();
-    expect(row.counter()).toBe(0);
+    expect(row.counter).toBe(0);
     expect(fn).toHaveBeenCalledTimes(1);
 
-    row.counter(1);
+    row.counter = 1;
 
-    expect(row.counter()).toBe(0); // because we are observing row, we need to wait until it is notified
+    expect(row.counter).toBe(0); // because we are observing row, we need to wait until it is notified
 
     wdb.notifyAll();
     expect(fn).toHaveBeenCalledTimes(2);
-    expect(row.counter()).toBe(1);
+    expect(row.counter).toBe(1);
   });
 
   test("worker modules in the same thread", async () => {
@@ -189,7 +184,7 @@ describe("Database Module", () => {
 
     const table = wdb.createTable("hello", { counter: "i32" });
     const firstRow = table.row(AnyStore.i32(1));
-    firstRow.counter(10);
+    firstRow.counter = 10;
 
     const module = wdb.createWorker();
     const other = await AnyStore.fromModule(module);
@@ -200,10 +195,10 @@ describe("Database Module", () => {
     }
 
     const otherRow = otherTable.row(AnyStore.i32(1));
-    expect(otherRow.counter()).toBe(10);
+    expect(otherRow.counter).toBe(10);
 
-    otherRow.counter(20);
-    expect(firstRow.counter()).toBe(20);
+    otherRow.counter = 20;
+    expect(firstRow.counter).toBe(20);
   });
 
   test("stress memory", async () => {
@@ -236,8 +231,8 @@ describe("Database Module", () => {
           const key = AnyStore.i32(index);
           // table.insert(key, AnyStore.string(item.name), "name");
           const row = table.row(key);
-          row.age(item.age);
-          row.height(item.height);
+          row.age = item.age;
+          row.height = item.height;
         });
       }
 

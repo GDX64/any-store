@@ -338,19 +338,30 @@ export class Table<T extends ColMap> {
     for (const col in this.tags) {
       const colIndex = this.colMap.get(col)!;
       const tag = this.tags[col];
-      (ThisRow as any).prototype[col] = new Function(
+      const set: any = new Function(
         "value",
         `
+        this.table._insert(this.id, value, "${col}", "${tag}");
+        return value;
+        `,
+      );
+
+      const get: any = new Function(`
         if(!arguments.length) {
           if(this.cache) {
             return this.cache[${colIndex}];
           }
           return this.table.wdb.getFromTable(this.table.id, this.id, ${colIndex});
-        }
-        this.table._insert(this.id, value, "${col}", "${tag}");
-        return value;
-        `,
-      );
+        }`);
+
+      Object.defineProperties(ThisRow.prototype as any, {
+        [col]: {
+          configurable: true,
+          get: get,
+          set: set,
+          enumerable: true,
+        },
+      });
     }
 
     this.rowConstructor = ThisRow;
@@ -393,9 +404,7 @@ export class Table<T extends ColMap> {
 }
 
 export type Row<T extends ColMap> = {
-  [K in keyof T as `${K & string}`]: (
-    value?: ValueMap[T[K]] | null,
-  ) => ValueMap[T[K]] | null;
+  [K in keyof T as `${K & string}`]: ValueMap[T[K]] | null;
 } & _Row<T>;
 
 export class _Row<T extends ColMap> {

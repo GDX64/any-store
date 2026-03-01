@@ -27,20 +27,16 @@ describe("benchmarks inserts", async () => {
   });
 
   bench("insert on db", async () => {
-    try {
-      db.withLock(() => {
-        mockData.forEach((item, index) => {
-          const key = AnyStore.i32(index);
-          const row = table.row(key);
+    db.withLock(() => {
+      mockData.forEach((item, index) => {
+        const key = AnyStore.i32(index);
+        const row = table.row(key);
 
-          row.update("name", item.name);
-          row.update("age", item.age);
-          row.update("height", item.height);
-        });
+        row.name = item.name;
+        row.age = item.age;
+        row.height = item.height;
       });
-    } catch (e) {
-      console.error(e);
-    }
+    });
   });
 
   const sqliteDB = new DatabaseSync(":memory:");
@@ -81,9 +77,9 @@ describe("benchmarks selects", async () => {
     const key = AnyStore.i32(index);
     const row = table.row(key);
 
-    row.name(item.name);
-    row.age(item.age);
-    row.height(item.height);
+    row.name = item.name;
+    row.age = item.age;
+    row.height = item.height;
   });
 
   const sqliteDB = new DatabaseSync(":memory:");
@@ -147,8 +143,8 @@ describe("benchmark counts", async () => {
 
   const row = table.row(AnyStore.i32(0));
   bench("count on db", () => {
-    const current = row.count() ?? 0;
-    row.update("count", current + 1);
+    const current = row.count ?? 0;
+    row.count = current + 1;
   });
 
   const sqliteDB = new DatabaseSync(":memory:");
