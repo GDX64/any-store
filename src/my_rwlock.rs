@@ -6,13 +6,8 @@ use std::{
 
 use crate::extern_functions;
 
-/**
- * IMPORTANT
- * I am ignoring the lock now because of a race condition I could not find yet
- * Because of this race condition, I am already locking the whole wasm module before calling the funcions
- */
 pub struct MyRwLock<T> {
-    lock: Lock,
+    pub lock: Lock,
     value: UnsafeCell<T>,
 }
 
@@ -28,18 +23,24 @@ impl<T> MyRwLock<T> {
     }
 
     pub fn write<'a>(&'a self) -> WriteGuard<'a, T> {
-        self.lock.lock();
-        return WriteGuard { rwlock: &self };
+        let result = self.lock.lock();
+        return WriteGuard {
+            rwlock: &self,
+            result,
+        };
     }
 }
 
 pub struct WriteGuard<'a, T> {
     rwlock: &'a MyRwLock<T>,
+    result: LockResult,
 }
 
 impl<T> Drop for WriteGuard<'_, T> {
     fn drop(&mut self) {
-        self.rwlock.lock.unlock();
+        if self.result == LockResult::AcquiredFromMe {
+            self.rwlock.lock.unlock();
+        }
     }
 }
 
@@ -57,24 +58,39 @@ impl<T> DerefMut for WriteGuard<'_, T> {
     }
 }
 
-const LOCKED: i32 = 1;
-const UNLOCKED: i32 = 0;
+const UNLOCKED: i32 = -1;
 
 pub struct Lock {
-    is_locked: AtomicI32,
+    lock_state: AtomicI32,
+}
+
+#[derive(PartialEq)]
+pub enum LockResult {
+    AlreadyHeldByCurrentThread,
+    AcquiredFromMe,
 }
 
 impl Lock {
     pub const fn new() -> Self {
         Lock {
-            is_locked: AtomicI32::new(UNLOCKED),
+            lock_state: AtomicI32::new(UNLOCKED),
         }
     }
 
-    pub fn lock(&self) {
+    pub fn lock(&self) -> LockResult {
+        let state = self.lock_state.load(Ordering::Relaxed);
+        if state == current_thread_value() {
+            return LockResult::AlreadyHeldByCurrentThread;
+        }
+
         while self
-            .is_locked
-            .compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed)
+            .lock_state
+            .compare_exchange(
+                UNLOCKED,
+                current_thread_value(),
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
             .is_err()
         {
             if extern_functions::is_main_thread() {
@@ -82,28 +98,38 @@ impl Lock {
             }
             #[cfg(target_arch = "wasm32")]
             unsafe {
-                let ptr = self.is_locked.as_ptr();
+                let ptr = self.lock_state.as_ptr();
                 std::arch::wasm32::memory_atomic_wait32(ptr, 1, 1000_000);
             }
         }
+        return LockResult::AcquiredFromMe;
     }
 
     pub fn unlock(&self) {
-        self.is_locked.store(UNLOCKED, Ordering::Release);
+        self.lock_state.store(UNLOCKED, Ordering::Release);
         #[cfg(target_arch = "wasm32")]
         unsafe {
-            std::arch::wasm32::memory_atomic_notify(self.is_locked.as_ptr(), 1);
+            std::arch::wasm32::memory_atomic_notify(self.lock_state.as_ptr(), 1);
         }
     }
 
     pub fn try_lock(&self) -> bool {
         return self
-            .is_locked
-            .compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed)
+            .lock_state
+            .compare_exchange(
+                UNLOCKED,
+                current_thread_value(),
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
             .is_ok();
     }
 
     pub fn pointer(&self) -> *const i32 {
-        return self.is_locked.as_ptr();
+        return self.lock_state.as_ptr();
     }
+}
+
+fn current_thread_value() -> i32 {
+    return extern_functions::worker_id() as i32;
 }

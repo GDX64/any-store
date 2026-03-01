@@ -2,7 +2,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     extern_functions::*,
-    my_rwlock::{Lock, MyRwLock},
+    my_rwlock::MyRwLock,
     storage::{Database, ListenerID, Operation},
     value::Something,
 };
@@ -46,45 +46,59 @@ fn pop_from_something_stack() -> Option<Something> {
     return pop_something();
 }
 
-static GLOBAL_LOCK: Lock = Lock::new();
-
-struct GlobalPool {
+struct GlobalState {
     db: MyRwLock<Database>,
 }
 
-impl GlobalPool {
+impl GlobalState {
     fn new() -> Self {
-        GlobalPool {
+        GlobalState {
             db: MyRwLock::new(Database::new()),
         }
     }
 
+    fn lock(&self) {
+        self.db.lock.lock();
+    }
+
+    fn unlock(&self) {
+        self.db.lock.unlock();
+    }
+
+    fn try_lock(&self) -> bool {
+        return self.db.lock.try_lock();
+    }
+
+    fn lock_pointer(&self) -> *const i32 {
+        return self.db.lock.pointer();
+    }
+
     fn with_db_mut<R, F: FnOnce(&mut Database) -> R>(&self, f: F) -> Option<R> {
-        let mut pool = self.db.write();
-        return Some(f(&mut pool));
+        let mut state = self.db.write();
+        return Some(f(&mut state));
     }
 }
 
-static GLOBALS: LazyLock<GlobalPool> = LazyLock::new(|| GlobalPool::new());
+static GLOBALS: LazyLock<GlobalState> = LazyLock::new(|| GlobalState::new());
 
 #[wasm_bindgen]
 pub fn lock() {
-    GLOBAL_LOCK.lock();
+    GLOBALS.lock();
 }
 
 #[wasm_bindgen]
 pub fn unlock() {
-    GLOBAL_LOCK.unlock();
+    GLOBALS.unlock();
 }
 
 #[wasm_bindgen]
 pub fn try_lock() -> bool {
-    return GLOBAL_LOCK.try_lock();
+    return GLOBALS.try_lock();
 }
 
 #[wasm_bindgen]
 pub fn lock_pointer() -> *const i32 {
-    return GLOBAL_LOCK.pointer();
+    return GLOBALS.lock_pointer();
 }
 
 #[wasm_bindgen]
