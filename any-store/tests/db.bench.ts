@@ -14,9 +14,9 @@ vi.stubGlobal(
 describe("benchmarks inserts", async () => {
   const mockData = Array.from({ length: 100 }, (_, i) => {
     return {
-      age: AnyStore.i32(Math.round(Math.random() * 100)),
-      height: AnyStore.f64(Math.random() * 2),
-      name: AnyStore.string("PETR4" + i),
+      age: Math.round(Math.random() * 100),
+      height: Math.random() * 2,
+      name: "PETR4" + i,
     };
   });
   const db = await AnyStore.create();
@@ -32,7 +32,11 @@ describe("benchmarks inserts", async () => {
         });
         mockData.forEach((item, index) => {
           const key = AnyStore.i32(index);
-          table.insertRow(key, [item.name, item.age, item.height]);
+          const row = table.row(key);
+
+          row.update("name", item.name);
+          row.update("age", item.age);
+          row.update("height", item.height);
         });
       } catch (e) {
         console.error(e);
@@ -51,9 +55,9 @@ describe("benchmarks inserts", async () => {
         map.set(
           index,
           structuredClone({
-            name: item.name.value,
-            age: item.age.value,
-            height: item.height.value,
+            name: item.name,
+            age: item.age,
+            height: item.height,
           }),
         );
       });
@@ -80,7 +84,7 @@ describe("benchmarks inserts", async () => {
         `INSERT INTO ${tableName} (id, name, age, height) VALUES (?, ?, ?, ?);`,
       );
       mockData.forEach((item, index) => {
-        stmt.run(index, item.name.value, item.age.value, item.height.value);
+        stmt.run(index, item.name, item.age, item.height);
       });
       sqliteDB.exec("COMMIT");
     },

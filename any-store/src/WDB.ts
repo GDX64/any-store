@@ -209,14 +209,6 @@ export class AnyStore {
     return new Table<T>(colMap, id, this);
   }
 
-  insertRowOnTable(tableID: number, key: Something, values: Something[]) {
-    values.forEach((value) => {
-      this.ops.putSomethingOnStack(value.value, value.tag);
-    });
-    this.ops.putSomethingOnStack(key.value, key.tag);
-    this.ops.exports.table_insert_row(tableID);
-  }
-
   insertOnTable(
     tableID: number,
     col: number,
@@ -359,10 +351,6 @@ export class Table<T extends ColMap> {
 
   removeListenerFromRow(key: Something, listenerID: number) {
     this.wdb.removeListenerFromRow(this.id, key, listenerID);
-  }
-
-  insertRow(key: Something, values: Something[]) {
-    this.wdb.insertRowOnTable(this.id, key, values);
   }
 
   get(key: Something, colName: keyof T): Something["value"] | null {

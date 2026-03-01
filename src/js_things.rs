@@ -6,10 +6,28 @@ use crate::{
     storage::{Database, ListenerID, Operation},
     value::Something,
 };
-use std::sync::LazyLock;
+use std::{cell::RefCell, sync::LazyLock};
+
+struct SomethingStack {
+    stack: Vec<Something>,
+}
+
+impl SomethingStack {
+    const fn new() -> Self {
+        SomethingStack { stack: Vec::new() }
+    }
+
+    fn push(&mut self, value: Something) {
+        self.stack.push(value);
+    }
+
+    fn pop(&mut self) -> Option<Something> {
+        self.stack.pop()
+    }
+}
 
 thread_local! {
-    static SOMETHING_STACK: std::cell::RefCell<Vec<Something>> = std::cell::RefCell::new(Vec::new());
+    static SOMETHING_STACK: RefCell<SomethingStack> = RefCell::new(SomethingStack::new());
 }
 
 fn pop_something() -> Option<Something> {
@@ -18,14 +36,6 @@ fn pop_something() -> Option<Something> {
 
 fn push_something(value: Something) {
     SOMETHING_STACK.with(|stack| stack.borrow_mut().push(value));
-}
-
-fn take_something_stack() -> Vec<Something> {
-    return SOMETHING_STACK.with(|stack| {
-        let v = stack.clone();
-        stack.borrow_mut().clear();
-        return v.into_inner();
-    });
 }
 
 fn push_to_something_stack(value: Something) {
@@ -158,17 +168,6 @@ pub fn table_insert(table: usize, col: usize) {
             key,
             value,
             index: col,
-        });
-    });
-}
-
-#[wasm_bindgen]
-pub fn table_insert_row(table: usize) {
-    GLOBALS.with_db_mut(|db| {
-        let v = take_something_stack();
-        db.operation(Operation::InsertRow {
-            table_id: table,
-            data: v,
         });
     });
 }
