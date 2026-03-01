@@ -83,10 +83,6 @@ pub struct Database {
 }
 
 pub enum Operation {
-    InsertRow {
-        table_id: usize,
-        data: Vec<Something>,
-    },
     Insert {
         table_id: usize,
         key: Something,
@@ -127,11 +123,6 @@ impl Database {
 
     pub fn operation(&mut self, op: Operation) {
         match op {
-            Operation::InsertRow { table_id, data } => {
-                self.get_table_mut(table_id).and_then(|table| {
-                    return table.insert_row(data);
-                });
-            }
             Operation::Insert {
                 table_id,
                 key,
@@ -248,16 +239,6 @@ impl Table {
 
     pub fn iter(&self) -> impl Iterator<Item = (&Something, &Row)> {
         self.items.iter()
-    }
-
-    pub fn insert_row(&mut self, mut values: Vec<Something>) -> Option<()> {
-        let key = values.pop()?;
-        let row = self.items.entry(key).or_insert_with(|| {
-            return Row::new();
-        });
-        row.values = values;
-        row.notify(&mut self.notifications);
-        Some(())
     }
 
     pub fn insert_at(&mut self, key: Something, value: Something, index: usize) {
