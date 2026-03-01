@@ -294,39 +294,34 @@ impl Table {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RowsCollection {
-    rows: Vec<Option<Row>>,
-    gaps: Vec<usize>,
+    rows: HashMap<u32, Row>,
+    next_id: usize,
 }
 
 impl RowsCollection {
     pub fn new() -> Self {
         return RowsCollection {
-            rows: Vec::new(),
-            gaps: Vec::new(),
+            rows: HashMap::new(),
+            next_id: 0,
         };
     }
 
     pub fn insert(&mut self, row: Row) -> u32 {
-        if !self.gaps.is_empty() {
-            let gap = self.gaps.pop().unwrap();
-            self.rows[gap] = Some(row);
-            return gap as u32;
-        }
-        self.rows.push(Some(row));
-        return (self.rows.len() - 1) as u32;
+        let id = self.next_id as u32;
+        self.rows.insert(id, row);
+        self.next_id += 1;
+        return id;
     }
 
     pub fn get(&self, id: &u32) -> Option<&Row> {
-        return self.rows.get(*id as usize)?.as_ref();
+        return self.rows.get(id);
     }
 
     pub fn get_mut(&mut self, id: &u32) -> Option<&mut Row> {
-        return self.rows.get_mut(*id as usize)?.as_mut();
+        return self.rows.get_mut(id);
     }
 
     pub fn remove(&mut self, id: &u32) -> Option<Row> {
-        let last = self.rows.get_mut(*id as usize)?.take();
-        self.gaps.push(*id as usize);
-        return last;
+        return self.rows.remove(id);
     }
 }
