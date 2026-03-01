@@ -198,8 +198,7 @@ impl Database {
 pub struct Table {
     items: HashMap<Something, u32>,
     notifications: Vec<ListenerID>,
-    rows: HashMap<u32, Row>,
-    last_row_id: u32,
+    rows: RowsCollection,
 }
 
 impl Table {
@@ -207,8 +206,7 @@ impl Table {
         Table {
             items: HashMap::new(),
             notifications: Vec::new(),
-            rows: HashMap::new(),
-            last_row_id: 0,
+            rows: RowsCollection::new(),
         }
     }
 
@@ -256,11 +254,10 @@ impl Table {
         if let Some(row) = row {
             return *row;
         }
-        self.last_row_id += 1;
-        let id = self.last_row_id;
-        self.items.insert(key.clone(), id);
-        let row = Row::new(key);
-        self.rows.insert(id, row);
+
+        let row = Row::new(key.clone());
+        let id = self.rows.insert(row);
+        self.items.insert(key, id);
         return id;
     }
 
@@ -292,5 +289,44 @@ impl Table {
 
     pub fn len(&self) -> usize {
         return self.items.len();
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RowsCollection {
+    rows: Vec<Option<Row>>,
+    gaps: Vec<usize>,
+}
+
+impl RowsCollection {
+    pub fn new() -> Self {
+        return RowsCollection {
+            rows: Vec::new(),
+            gaps: Vec::new(),
+        };
+    }
+
+    pub fn insert(&mut self, row: Row) -> u32 {
+        if !self.gaps.is_empty() {
+            let gap = self.gaps.pop().unwrap();
+            self.rows[gap] = Some(row);
+            return gap as u32;
+        }
+        self.rows.push(Some(row));
+        return (self.rows.len() - 1) as u32;
+    }
+
+    pub fn get(&self, id: &u32) -> Option<&Row> {
+        return self.rows.get(*id as usize)?.as_ref();
+    }
+
+    pub fn get_mut(&mut self, id: &u32) -> Option<&mut Row> {
+        return self.rows.get_mut(*id as usize)?.as_mut();
+    }
+
+    pub fn remove(&mut self, id: &u32) -> Option<Row> {
+        let last = self.rows.get_mut(*id as usize)?.take();
+        self.gaps.push(*id as usize);
+        return last;
     }
 }
