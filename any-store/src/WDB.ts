@@ -323,7 +323,7 @@ type ValueMap = {
 
 export class Table<T extends ColMap> {
   colMap: Map<string, number> = new Map();
-  private rowConstructor: typeof Row;
+  private rowConstructor: typeof _Row;
   constructor(
     private tags: T,
     private id: number,
@@ -333,7 +333,7 @@ export class Table<T extends ColMap> {
       this.colMap.set(colName, index);
     });
 
-    class ThisRow extends Row<any> {}
+    class ThisRow extends _Row<any> {}
 
     for (const col in this.tags) {
       const colIndex = this.colMap.get(col)!;
@@ -342,6 +342,9 @@ export class Table<T extends ColMap> {
         "value",
         `
         if(!arguments.length) {
+          if(this.cache) {
+            return this.cache[${colIndex}];
+          }
           return this.table.wdb.getFromTable(this.table.id, this.id, ${colIndex});
         }
         this.table._insert(this.id, value, "${col}", "${tag}");
@@ -385,17 +388,17 @@ export class Table<T extends ColMap> {
 
   row(key: Something) {
     const id = this.wdb.createRow(key, this.id);
-    return new this.rowConstructor<T>(this, id, key) as MyRow<T>;
+    return new this.rowConstructor<T>(this, id, key) as Row<T>;
   }
 }
 
-type MyRow<T extends ColMap> = {
+export type Row<T extends ColMap> = {
   [K in keyof T as `${K & string}`]: (
     value?: ValueMap[T[K]] | null,
   ) => ValueMap[T[K]] | null;
-} & Row<T>;
+} & _Row<T>;
 
-export class Row<T extends ColMap> {
+export class _Row<T extends ColMap> {
   private cache: Something["value"][] | null = null;
 
   constructor(
@@ -403,15 +406,6 @@ export class Row<T extends ColMap> {
     private id: number = 0,
     public readonly key: Something,
   ) {}
-
-  get<K extends keyof T>(colName: K): ValueMap[T[K]] | null {
-    type MyValue = ValueMap[T[K]];
-    if (this.cache) {
-      const col = this.table.colMap.get(colName as string);
-      return col != null ? (this.cache[col] as MyValue) : null;
-    }
-    return this.table.get(this.id, colName) as MyValue;
-  }
 
   private load() {
     this.cache = this.table.getRow(this.id);
@@ -430,10 +424,6 @@ export class Row<T extends ColMap> {
 
   delete() {
     return this.table.deleteRow(this.id);
-  }
-
-  update<K extends keyof T>(colName: K, value: ValueMap[T[K]] | null) {
-    this.table._insert(this.id, value, colName);
   }
 
   removeListener(listenerID: number) {
