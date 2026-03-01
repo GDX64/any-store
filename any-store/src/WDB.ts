@@ -243,11 +243,10 @@ export class AnyStore {
 
   getFromTable(
     tableID: number,
-    key: Something,
+    rowID: number,
     col: number,
   ): Something["value"] | null {
-    this.ops.putSomethingOnStack(key.value, key.tag);
-    this.ops.tableGetSomething(tableID, col);
+    this.ops.tableGetSomething(tableID, col, rowID);
     const value = popObjectFromStack();
     return value ?? null;
   }
@@ -355,9 +354,9 @@ export class Table<T extends ColMap> {
     this.wdb.removeListenerFromRow(this.id, rowID, listenerID);
   }
 
-  get(key: Something, colName: keyof T): Something["value"] | null {
+  get(rowID: number, colName: keyof T): Something["value"] | null {
     const col = this.colMap.get(colName as string);
-    return this.wdb.getFromTable(this.id, key, col!);
+    return this.wdb.getFromTable(this.id, rowID, col!);
   }
 
   deleteRow(rowID: number) {
@@ -366,7 +365,7 @@ export class Table<T extends ColMap> {
 
   row(key: Something) {
     const id = this.wdb.createRow(key, this.id);
-    return new Row<T>(this, key, id);
+    return new Row<T>(this, id, key);
   }
 }
 
@@ -375,8 +374,8 @@ export class Row<T extends ColMap> {
 
   constructor(
     private table: Table<T>,
-    private key: Something,
     private id: number = 0,
+    public readonly key: Something,
   ) {}
 
   get<K extends keyof T>(colName: K): ValueMap[T[K]] | null {
@@ -385,7 +384,7 @@ export class Row<T extends ColMap> {
       const col = this.table.colMap.get(colName as string);
       return col != null ? (this.cache[col] as MyValue) : null;
     }
-    return this.table.get(this.key, colName) as MyValue;
+    return this.table.get(this.id, colName) as MyValue;
   }
 
   private load() {
@@ -522,7 +521,7 @@ class Ops {
     this.exports.table_insert(tableID, col, rowID);
   }
 
-  tableGetSomething(tableID: number, col: number): void {
-    this.exports.table_get_something(tableID, col);
+  tableGetSomething(tableID: number, col: number, rowID: number): void {
+    this.exports.table_get_something(tableID, col, rowID);
   }
 }

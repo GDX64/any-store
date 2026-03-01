@@ -135,17 +135,15 @@ pub fn table_get_id_from_name() -> i32 {
 }
 
 #[wasm_bindgen]
-pub fn table_get_something(table: usize, col: usize) {
-    _table_get_something(table, col);
+pub fn table_get_something(table: usize, col: usize, row_id: u32) {
+    _table_get_something(table, col, row_id);
 }
 
-fn _table_get_something(table: usize, col: usize) -> Option<()> {
-    let key = pop_from_something_stack()?;
+fn _table_get_something(table: usize, col: usize, row_id: u32) -> Option<()> {
     let something = GLOBALS.with_db_mut(|db| {
         let table = db.get_table(table)?;
-        return table.get_row_by_key(&key).and_then(|row| {
-            return Some(row.get(col).clone());
-        });
+        let row = table.get_row(row_id)?;
+        return Some(row.get(col).clone());
     })??;
     add_something_to_js_stack(&something);
     return Some(());
