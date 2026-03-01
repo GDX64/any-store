@@ -81,9 +81,9 @@ describe("benchmarks selects", async () => {
     const key = AnyStore.i32(index);
     const row = table.row(key);
 
-    row.update("name", item.name);
-    row.update("age", item.age);
-    row.update("height", item.height);
+    row.name(item.name);
+    row.age(item.age);
+    row.height(item.height);
   });
 
   const sqliteDB = new DatabaseSync(":memory:");
@@ -147,7 +147,7 @@ describe("benchmark counts", async () => {
 
   const row = table.row(AnyStore.i32(0));
   bench("count on db", () => {
-    const current = row.get("count") ?? 0;
+    const current = row.count() ?? 0;
     row.update("count", current + 1);
   });
 

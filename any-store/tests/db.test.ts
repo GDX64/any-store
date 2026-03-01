@@ -51,6 +51,21 @@ describe("Database Module", () => {
     expect(row1.get("name")).toBeNull();
   });
 
+  test("using accessors", async () => {
+    const wdb = await AnyStore.create();
+    const table = wdb.createTable("test_table", {
+      name: "string",
+      age: "i32",
+    });
+    const k1 = AnyStore.i32(123);
+    const row = table.row(k1);
+    row.name("Alice");
+    row.age(30);
+
+    expect(row.name()).toBe("Alice");
+    expect(row.age()).toBe(30);
+  });
+
   test("insert and remove random data", async () => {
     const mockData = new Map<
       number,

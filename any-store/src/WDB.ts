@@ -323,6 +323,7 @@ type ValueMap = {
 
 export class Table<T extends ColMap> {
   colMap: Map<string, number> = new Map();
+  private rowConstructor: typeof Row;
   constructor(
     private tags: T,
     private id: number,
@@ -331,6 +332,25 @@ export class Table<T extends ColMap> {
     Object.keys(tags).forEach((colName, index) => {
       this.colMap.set(colName, index);
     });
+
+    class ThisRow extends Row<any> {}
+
+    for (const col in this.tags) {
+      const colIndex = this.colMap.get(col)!;
+      const tag = this.tags[col];
+      (ThisRow as any).prototype[col] = new Function(
+        "value",
+        `
+        if(!arguments.length) {
+          return this.table.wdb.getFromTable(this.table.id, this.id, ${colIndex});
+        }
+        this.table._insert(this.id, value, "${col}", "${tag}");
+        return value;
+        `,
+      );
+    }
+
+    this.rowConstructor = ThisRow;
   }
 
   private tagOf(colName: keyof T): Something["tag"] {
@@ -365,9 +385,15 @@ export class Table<T extends ColMap> {
 
   row(key: Something) {
     const id = this.wdb.createRow(key, this.id);
-    return new Row<T>(this, id, key);
+    return new this.rowConstructor<T>(this, id, key) as MyRow<T>;
   }
 }
+
+type MyRow<T extends ColMap> = {
+  [K in keyof T as `${K & string}`]: (
+    value?: ValueMap[T[K]] | null,
+  ) => ValueMap[T[K]] | null;
+} & Row<T>;
 
 export class Row<T extends ColMap> {
   private cache: Something["value"][] | null = null;
