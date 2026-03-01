@@ -80,7 +80,7 @@ impl Row {
 
 pub struct Database {
     last_table_id: usize,
-    tables: HashMap<usize, Table>,
+    tables: Vec<Table>,
     next_listener_id: u32,
 }
 
@@ -103,17 +103,17 @@ impl Database {
     pub fn new() -> Self {
         let mut db = Database {
             last_table_id: 0,
-            tables: HashMap::default(),
+            tables: Vec::new(),
             next_listener_id: 0,
         };
-        db.tables.insert(NAMES_TABLE_INDEX, Table::new());
+        db.tables.push(Table::new());
         return db;
     }
 
     pub fn take_notifications(&mut self, worker_id: u8) -> Vec<i32> {
         let notifications: HashSet<i32> = self
             .tables
-            .values_mut()
+            .iter_mut()
             .flat_map(|table| {
                 return table.take_notifications(worker_id).into_iter();
             })
@@ -151,13 +151,13 @@ impl Database {
     ) -> Option<()> {
         let listener_id = ListenerID::new(listener_id, worker_id() as u8);
         self.tables
-            .get_mut(&table_id)?
+            .get_mut(table_id)?
             .remove_listener(row_id, listener_id);
         return Some(());
     }
 
     pub fn add_listener_to(&mut self, table_id: usize, row_id: u32) -> Option<ListenerID> {
-        let table = self.tables.get_mut(&table_id)?;
+        let table = self.tables.get_mut(table_id)?;
         let listener_id = ListenerID::new(self.next_listener_id, worker_id() as u8);
         self.next_listener_id += 1;
         table.add_listener(listener_id, row_id)?;
@@ -168,14 +168,14 @@ impl Database {
         self.last_table_id += 1;
         let table_id = self.last_table_id;
         self.tables.insert(table_id, Table::new());
-        self.tables.get_mut(&NAMES_TABLE_INDEX).map(|table| {
+        self.tables.get_mut(NAMES_TABLE_INDEX).map(|table| {
             table.insert_at_by_key(&name, Something::Int(table_id as i32), 0);
         });
         return table_id;
     }
 
     pub fn get_table_id(&self, name: Something) -> Option<usize> {
-        let table = self.tables.get(&NAMES_TABLE_INDEX)?;
+        let table = self.tables.get(NAMES_TABLE_INDEX)?;
         let row = table.get_row_by_key(&name)?;
         if let Something::Int(id) = row.get(0) {
             return Some(*id as usize);
@@ -184,12 +184,12 @@ impl Database {
     }
 
     pub fn get_table_mut(&mut self, table_id: usize) -> Option<&mut Table> {
-        let thing = self.tables.get_mut(&table_id)?;
+        let thing = self.tables.get_mut(table_id)?;
         return Some(thing);
     }
 
     pub fn get_table<'a>(&'a self, table_id: usize) -> Option<&'a Table> {
-        let thing = self.tables.get(&table_id)?;
+        let thing = self.tables.get(table_id)?;
         return Some(thing);
     }
 }
