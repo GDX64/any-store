@@ -12,19 +12,21 @@ vi.stubGlobal(
 
 describe("Database Module", () => {
   test("should initialize the database correctly", async () => {
-    const wdb = await AnyStore.create();
-    const table = wdb.createTable("test_table", {
+    const db = await AnyStore.create();
+    const table = db.createTable("test_table", {
       name: "string",
       age: "i32",
       height: "f64",
       data: "blob",
     });
+
     const k1 = AnyStore.i32(123);
     const row = table.row(k1);
     row.name = "Alice";
     row.age = 30;
     row.height = 1.75;
     row.data = new Uint8Array([1, 2, 3]);
+
     const row2 = table.row(AnyStore.i32(0));
     row2.name = "Bob";
 
