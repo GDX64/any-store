@@ -140,13 +140,12 @@ pub fn table_get_something(table: usize, col: usize, row_id: u32) {
 }
 
 fn _table_get_something(table: usize, col: usize, row_id: u32) -> Option<()> {
-    let something = GLOBALS.with_db_mut(|db| {
+    return GLOBALS.with_db_mut(|db| {
         let table = db.get_table(table)?;
         let row = table.get_row(row_id)?;
-        return Some(row.get(col).clone());
-    })??;
-    add_something_to_js_stack(&something);
-    return Some(());
+        add_something_to_js_stack(row.get(col));
+        return Some(());
+    })?;
 }
 
 #[wasm_bindgen]

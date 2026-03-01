@@ -16,38 +16,40 @@ fn multi_threaded() {
     let table = js::table_create();
     const COL: usize = 0;
     const N_REPETITIONS: usize = 10_000;
-    fn test(table: usize) {
+    js::something_push_i32_to_stack(0);
+    let row_id = js::table_create_row(table) as u32;
+    js::something_push_i32_to_stack(0);
+    js::table_insert(table, COL, row_id);
+    let test = move || {
         for _ in 0..N_REPETITIONS {
             js::lock();
-            js::something_push_i32_to_stack(0);
-            js::table_get_something(table, COL);
-            let current_value = pop_mock_stack().unwrap_or(MockValue::Int(0));
+            js::table_get_something(table, COL, row_id);
+            let current_value = pop_mock_stack().unwrap();
             let MockValue::Int(current_value) = current_value else {
                 panic!("expected int");
             };
-            js::something_push_i32_to_stack(0);
             js::something_push_i32_to_stack(current_value + 1);
-            js::table_insert(table, COL);
+            js::table_insert(table, COL, row_id);
             js::unlock();
         }
-    }
+    };
     let t1 = thread::spawn(move || {
         set_worker_id(1);
-        test(table);
+        test();
     });
     let t2 = thread::spawn(move || {
         set_worker_id(2);
-        test(table);
+        test();
     });
 
     t1.join().unwrap();
     t2.join().unwrap();
 
     js::something_push_i32_to_stack(0);
-    js::table_get_something(table, COL);
-    let current_value = pop_mock_stack().unwrap_or(MockValue::Int(0));
+    js::table_get_something(table, COL, 0);
+    let current_value = pop_mock_stack().unwrap();
     let MockValue::Int(current_value) = current_value else {
         panic!("expected int");
     };
-    assert!(current_value == (N_REPETITIONS as i32) * 2);
+    assert_eq!(current_value, (N_REPETITIONS as i32) * 2);
 }
