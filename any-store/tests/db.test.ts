@@ -15,16 +15,16 @@ describe("Database Module", () => {
     });
 
     const k1 = AnyStore.i32(123);
-    const row = table.row(k1);
+    const row = table.createRow(k1);
     row.name = "Alice";
     row.age = 30;
     row.height = 1.75;
     row.data = new Uint8Array([1, 2, 3]);
 
-    const row2 = table.row(AnyStore.i32(0));
+    const row2 = table.createRow(AnyStore.i32(0));
     row2.name = "Bob";
 
-    const row1 = table.row(k1);
+    const row1 = table.createRow(k1);
     const { name, age, height, data } = row1;
 
     expect(name).toBe("Alice");
@@ -35,7 +35,7 @@ describe("Database Module", () => {
 
     expect(row1.name).toBeNull();
 
-    const row3 = table.row(AnyStore.i32(0));
+    const row3 = table.createRow(AnyStore.i32(0));
     expect(row3.name).toBe("Bob");
 
     row1.name = null;
@@ -49,7 +49,7 @@ describe("Database Module", () => {
       age: "i32",
     });
     const k1 = AnyStore.i32(123);
-    const row = table.row(k1);
+    const row = table.createRow(k1);
     row.name = "Alice";
     row.age = 30;
 
@@ -85,7 +85,7 @@ describe("Database Module", () => {
       for (const table of tables) {
         mockData.forEach((item, index) => {
           const key = AnyStore.i32(index);
-          const row = table.row(key);
+          const row = table.createRow(key);
           row.name = item.name;
           row.age = item.age;
           row.height = item.height;
@@ -93,7 +93,7 @@ describe("Database Module", () => {
 
         mockData.forEach((item, index) => {
           const key = AnyStore.i32(index);
-          const row = table.row(key);
+          const row = table.createRow(key);
           const rowData = row.getRow();
           expect(rowData[0]).toBe(item.name);
           expect(rowData[1]).toBe(item.age);
@@ -117,6 +117,14 @@ describe("Database Module", () => {
     for (let i = 0; i < N_REPETITIONS; i++) {
       insertAndRemove();
     }
+
+    for (const table of tables) {
+      table.clear();
+      mockData.forEach((_, index) => {
+        const row = table.getRow(AnyStore.i32(index));
+        expect(row).toBeNull();
+      });
+    }
   });
 
   test("add listener to row", async () => {
@@ -124,7 +132,7 @@ describe("Database Module", () => {
     const table = wdb.createTable("test_table", {
       counter: "i32",
     });
-    const row = table.row(AnyStore.i32(1));
+    const row = table.createRow(AnyStore.i32(1));
     const fn = vi.fn();
     const listenerID = row.addListener(fn);
     wdb.notifyAll();
@@ -149,7 +157,7 @@ describe("Database Module", () => {
     const table = wdb.createTable("test_table", {
       counter: "i32",
     });
-    const row = table.row(AnyStore.i32(1));
+    const row = table.createRow(AnyStore.i32(1));
 
     const fn = vi.fn();
 
@@ -179,7 +187,7 @@ describe("Database Module", () => {
     wdb.createTable("table2", { counter: "i32" }); //not used
 
     const table = wdb.createTable("hello", { counter: "i32" });
-    const firstRow = table.row(AnyStore.i32(1));
+    const firstRow = table.createRow(AnyStore.i32(1));
     firstRow.counter = 10;
 
     const module = wdb.createWorker();
@@ -190,7 +198,7 @@ describe("Database Module", () => {
       throw new Error("Table 'hello' not found in other module");
     }
 
-    const otherRow = otherTable.row(AnyStore.i32(1));
+    const otherRow = otherTable.createRow(AnyStore.i32(1));
     expect(otherRow.counter).toBe(10);
 
     otherRow.counter = 20;
@@ -206,16 +214,16 @@ describe("Database Module", () => {
     const team = db.createTable("team", {
       name: "string",
     });
-    const t1 = team.row(AnyStore.i32(1));
+    const t1 = team.createRow(AnyStore.i32(1));
     t1.name = "Team A";
-    const p1 = people.row(AnyStore.i32(1));
+    const p1 = people.createRow(AnyStore.i32(1));
     p1.name = "Alice";
     p1.team = t1.rowID;
 
     let rows = people.where("team", t1.rowID);
     expect(rows).toContain(p1.rowID);
 
-    const p2 = people.row(AnyStore.i32(2));
+    const p2 = people.createRow(AnyStore.i32(2));
     p2.name = "Bob";
     p2.team = t1.rowID;
 

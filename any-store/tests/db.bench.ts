@@ -24,7 +24,7 @@ describe("benchmarks inserts", async () => {
     db.withLock(() => {
       mockData.forEach((item, index) => {
         const key = AnyStore.i32(index);
-        const row = table.row(key);
+        const row = table.createRow(key);
 
         row.name = item.name;
         row.age = item.age;
@@ -69,7 +69,7 @@ describe("benchmarks selects", async () => {
   });
   mockData.forEach((item, index) => {
     const key = AnyStore.i32(index);
-    const row = table.row(key);
+    const row = table.createRow(key);
 
     row.name = item.name;
     row.age = item.age;
@@ -102,7 +102,7 @@ describe("benchmarks selects", async () => {
   const N = 1000;
   const rows = [...Array(N)].map(() => {
     const key = AnyStore.i32(Math.floor(Math.random() * 10_000));
-    return table.row(key);
+    return table.createRow(key);
   });
 
   bench("select on db", () => {
@@ -135,7 +135,7 @@ describe("benchmark counts", async () => {
     count: "i32",
   });
 
-  const row = table.row(AnyStore.i32(0));
+  const row = table.createRow(AnyStore.i32(0));
   bench("count on db", () => {
     const current = row.count ?? 0;
     row.count = current + 1;

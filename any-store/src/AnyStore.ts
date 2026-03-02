@@ -199,6 +199,10 @@ export class AnyStore {
     return new AnyStore(mod, workerData.memory);
   }
 
+  clearTable(tableID: number) {
+    this.ops.exports.table_clear(tableID);
+  }
+
   withColsEqual(
     tableID: number,
     col: number,
@@ -225,6 +229,12 @@ export class AnyStore {
   createTable<T extends ColMap>(name: string, colMap: T): Table<T> {
     const id = this.ops.createTable(name);
     return new Table<T>(colMap, id, this);
+  }
+
+  getRowID(tableID: number, key: Something): number | null {
+    this.ops.putSomethingOnStack(key.value, key.tag);
+    const id = this.ops.exports.table_get_row_id(tableID);
+    return id === -1 ? null : id;
   }
 
   insertOnTable(

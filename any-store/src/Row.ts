@@ -15,7 +15,7 @@ export class _Row<T extends ColMap> {
   ) {}
 
   private load() {
-    this.cache = this.table.getRow(this.rowID);
+    this.cache = this.table.getRowData(this.rowID);
   }
 
   cached(onUpdate?: () => void) {
@@ -41,6 +41,6 @@ export class _Row<T extends ColMap> {
     if (this.cache) {
       return this.cache;
     }
-    return this.table.getRow(this.rowID);
+    return this.table.getRowData(this.rowID);
   }
 }

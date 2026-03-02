@@ -8,7 +8,7 @@ self.onmessage = async (event) => {
     if (!table) {
       throw new Error("Table 'hello' not found in worker");
     }
-    const row = table.row(AnyStore.i32(1));
+    const row = table.createRow(AnyStore.i32(1));
     return row;
   });
   const n = event.data.n as number;

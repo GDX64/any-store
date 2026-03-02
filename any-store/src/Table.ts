@@ -48,6 +48,10 @@ export class Table<T extends ColMap> {
     this.rowConstructor = ThisRow;
   }
 
+  clear() {
+    this.wdb.clearTable(this.tableID);
+  }
+
   private tagOf(colName: keyof T): Something["tag"] {
     return this.tags[colName];
   }
@@ -56,7 +60,7 @@ export class Table<T extends ColMap> {
     return this.wdb.addListenerToRow(this.tableID, rowID, fn);
   }
 
-  getRow(rowID: number): Something["value"][] {
+  getRowData(rowID: number): Something["value"][] {
     return this.wdb.getRowFromTable(this.tableID, rowID);
   }
 
@@ -84,9 +88,17 @@ export class Table<T extends ColMap> {
     this.wdb.deleteRowFromTable(this.tableID, rowID);
   }
 
-  row(key: Something) {
+  createRow(key: Something) {
     const id = this.wdb.createRow(key, this.tableID);
     return new this.rowConstructor<T>(this, id, key) as Row<T>;
+  }
+
+  getRow(key: Something) {
+    const rowID = this.wdb.getRowID(this.tableID, key);
+    if (rowID === null) {
+      return null;
+    }
+    return new this.rowConstructor<T>(this, rowID, key) as Row<T>;
   }
 
   where<K extends keyof T>(colName: K, value: ValueMap[T[K]]): number[] {

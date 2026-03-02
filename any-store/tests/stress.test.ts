@@ -34,7 +34,7 @@ describe("stress test", () => {
         mockData.forEach((item, index) => {
           const key = AnyStore.i32(index);
           // table.insert(key, AnyStore.string(item.name), "name");
-          const row = table.row(key);
+          const row = table.createRow(key);
           row.age = item.age;
           row.height = item.height;
         });
@@ -42,7 +42,7 @@ describe("stress test", () => {
 
       for (const table of tables) {
         mockData.forEach((_, index) => {
-          const row = table.row(AnyStore.i32(index));
+          const row = table.createRow(AnyStore.i32(index));
           row.delete();
         });
       }

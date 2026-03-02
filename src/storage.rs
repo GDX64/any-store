@@ -29,6 +29,7 @@ pub struct Row {
     values: Vec<Something>,
     listeners: Option<Vec<ListenerID>>,
     key: Something,
+    pub id: u32,
 }
 
 impl Row {
@@ -37,6 +38,7 @@ impl Row {
             values: Vec::new(),
             listeners: None,
             key,
+            id: 0,
         }
     }
 
@@ -210,6 +212,14 @@ impl Table {
         }
     }
 
+    pub fn clear(&mut self) {
+        for row in self.rows.iter() {
+            row.1.notify(&mut self.notifications);
+        }
+        self.items = HashMap::new();
+        self.rows = RowsCollection::new();
+    }
+
     pub fn remove_listener(&mut self, row_id: u32, listener_id: ListenerID) -> Option<()> {
         self.rows.get_mut(&row_id)?.remove_listener(listener_id);
         return Some(());
@@ -320,8 +330,9 @@ impl RowsCollection {
         };
     }
 
-    pub fn insert(&mut self, row: Row) -> u32 {
+    pub fn insert(&mut self, mut row: Row) -> u32 {
         let id = self.next_id as u32;
+        row.id = id;
         self.rows.insert(id, row);
         self.next_id += 1;
         return id;

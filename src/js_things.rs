@@ -119,6 +119,27 @@ pub fn table_create() -> usize {
 }
 
 #[wasm_bindgen]
+pub fn table_get_row_id(table_id: usize) -> i32 {
+    return GLOBALS
+        .with_db_mut(|db| {
+            let key = pop_from_something_stack()?;
+            let table = db.get_table(table_id)?;
+            let row = table.get_row_by_key(&key)?;
+            return Some(row.id as i32);
+        })
+        .unwrap_or(None)
+        .unwrap_or(-1);
+}
+#[wasm_bindgen]
+pub fn table_clear(table_id: usize) {
+    GLOBALS.with_db_mut(|db| {
+        if let Some(table) = db.get_table_mut(table_id) {
+            table.clear();
+        }
+    });
+}
+
+#[wasm_bindgen]
 pub fn table_get_id_from_name() -> i32 {
     let name = pop_from_something_stack().expect("there should be a name for the table");
     return GLOBALS

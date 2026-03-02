@@ -28,7 +28,7 @@ describe("Web Worker", async () => {
         counter: "i32",
       });
 
-      const row = table.row(AnyStore.i32(1));
+      const row = table.createRow(AnyStore.i32(1));
       row.counter = 0;
       return row;
     });
