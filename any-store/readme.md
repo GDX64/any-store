@@ -24,28 +24,28 @@ const table = db.createTable("users", {
   data: "blob",
 });
 
-// Get a row handle with a key
-const row = table.row(AnyStore.i32(1));
+// Create or get a row handle with a key
+const row = table.createRow(AnyStore.i32(1));
 
-// Update values (values are passed directly, not wrapped)
-row.update("name", "Alice");
-row.update("age", 30);
-row.update("height", 1.75);
-row.update("data", new Uint8Array([1, 2, 3]));
+// Set values using property accessors (fully type-safe)
+row.name = "Alice";
+row.age = 30;
+row.height = 1.75;
+row.data = new Uint8Array([1, 2, 3]);
 
-// Read values (fully type-safe)
-const name: string | null = row.get("name"); // "Alice"
-const age: number | null = row.get("age"); // 30
-const height: number | null = row.get("height"); // 1.75
-const data: Uint8Array | null = row.get("data"); // Uint8Array([1, 2, 3])
+// Read values using property accessors
+const name: string | null = row.name; // "Alice"
+const age: number | null = row.age; // 30
+const height: number | null = row.height; // 1.75
+const data: Uint8Array | null = row.data; // Uint8Array([1, 2, 3])
 
-// Update with null to remove a value
-row.update("name", null);
-console.log(row.get("name")); // null
+// Set to null to remove a value
+row.name = null;
+console.log(row.name); // null
 
 // Delete the entire row
 row.delete();
-console.log(row.get("age")); // null
+console.log(row.age); // null
 ```
 
 ## Key Types
@@ -75,19 +75,22 @@ const table = db.createTable("products", {
   stock: "i32",
 });
 
-// Create a row handle
-const row = table.row(AnyStore.i32(1));
+// Create or get a row handle
+const row = table.createRow(AnyStore.i32(1));
 
-// Update individual columns
-row.update("name", "Laptop");
-row.update("price", 999.99);
-row.update("stock", 5);
+// Set individual columns using property accessors
+row.name = "Laptop";
+row.price = 999.99;
+row.stock = 5;
 
-// Get individual values
-const price = row.get("price"); // 999.99
+// Get individual values using property accessors
+const price = row.price; // 999.99
 
-// Get the entire row as an array
+// Get the entire row as an array (in schema order)
 const rowData = row.getRow(); // ["Laptop", 999.99, 5]
+
+// Use destructuring for convenient access
+const { name, price: currentPrice, stock } = row;
 
 // Delete the row
 row.delete();
@@ -99,15 +102,15 @@ Listen to row changes for reactive updates:
 
 ```ts
 const table = db.createTable("counter", { value: "i32" });
-const row = table.row(AnyStore.i32(1));
+const row = table.createRow(AnyStore.i32(1));
 
 // Add a listener to be notified when the row changes
 const listenerID = row.addListener(() => {
-  console.log("Row changed:", row.get("value"));
+  console.log("Row changed:", row.value);
 });
 
 // Listeners are not called immediately after updates
-row.update("value", 10);
+row.value = 10;
 
 // Listeners trigger only when notifyAll() is called
 db.notifyAll(); // Triggers all pending listener notifications
@@ -125,32 +128,32 @@ Enable caching on a row to avoid reading from the database on every access:
 
 ```ts
 const table = db.createTable("counter", { value: "i32" });
-const row = table.row(AnyStore.i32(1));
+const row = table.createRow(AnyStore.i32(1));
 
 // Enable caching with optional update callback
 row.cached(() => {
-  console.log("Cache updated:", row.get("value"));
+  console.log("Cache updated:", row.value);
 });
 
 // First read returns null (no data yet)
-console.log(row.get("value")); // null
+console.log(row.value); // null
 
-row.update("value", 0);
+row.value = 0;
 
 // Cache is not updated immediately
-console.log(row.get("value")); // null (still using cached value)
+console.log(row.value); // null (still using cached value)
 
 // Notify to update the cache
 db.notifyAll(); // Triggers callback and updates cache
-console.log(row.get("value")); // 0 (from cache)
+console.log(row.value); // 0 (from cache)
 
-row.update("value", 1);
+row.value = 1;
 
 // Cache still shows old value until notified
-console.log(row.get("value")); // 0
+console.log(row.value); // 0
 
 db.notifyAll(); // Updates cache again
-console.log(row.get("value")); // 1
+console.log(row.value); // 1
 ```
 
 ## Usage with Workers
@@ -164,8 +167,8 @@ import { AnyStore } from "@glmachado/any-store";
 const db = await AnyStore.create();
 const table = db.createTable("shared", { counter: "i32" });
 
-const row = table.row(AnyStore.i32(1));
-row.update("counter", 0);
+const row = table.createRow(AnyStore.i32(1));
+row.counter = 0;
 
 // Create worker data to share
 const workerData = db.createWorker();
@@ -188,12 +191,12 @@ self.onmessage = async (event) => {
     throw new Error("Table not found");
   }
   
-  const row = table.row(AnyStore.i32(1));
+  const row = table.createRow(AnyStore.i32(1));
   
   // Read and modify shared data
   db.withLock(() => {
-    const current = row.get("counter") ?? 0;
-    row.update("counter", current + 1);
+    const current = row.counter ?? 0;
+    row.counter = current + 1;
   });
 };
 ```
@@ -206,15 +209,84 @@ When working with workers, use `withLock()` to ensure atomic operations:
 // Synchronous lock - blocks in workers (uses Atomics.wait)
 // Spins in main thread (cannot use Atomics.wait)
 db.withLock(() => {
-  const current = row.get("counter") ?? 0;
-  row.update("counter", current + 1);
+  const current = row.counter ?? 0;
+  row.counter = current + 1;
 });
 
 // Async lock - doesn't block main thread
 await db.withLockAsync(async () => {
-  const current = row.get("counter") ?? 0;
-  row.update("counter", current + 1);
+  const current = row.counter ?? 0;
+  row.counter = current + 1;
 });
+```
+
+## Atomic Operations on Rows
+
+Perform multiple operations on a single row atomically using `withLock()`:
+
+```ts
+const table = db.createTable("counter", { value: "i32" });
+const row = table.createRow(AnyStore.i32(1));
+
+db.withLock(() => {
+  row.value = 0;
+  for (let i = 0; i < 1000_000; i++) {
+    row.value += 1;
+  }
+});
+
+console.log(row.value); // 1000000
+```
+
+## Foreign Keys and Querying
+
+Use the `where()` method to query rows by column value, useful for foreign key relationships:
+
+```ts
+const db = await AnyStore.create();
+const people = db.createTable("people", {
+  name: "string",
+  team: "i32",
+});
+const teams = db.createTable("teams", {
+  name: "string",
+});
+
+// Create a team
+const team1 = teams.createRow(AnyStore.i32(1));
+team1.name = "Team A";
+
+// Create people with foreign key reference to team
+const person1 = people.createRow(AnyStore.i32(1));
+person1.name = "Alice";
+person1.team = team1.rowID; // Use rowID as foreign key
+
+const person2 = people.createRow(AnyStore.i32(2));
+person2.name = "Bob";
+person2.team = team1.rowID;
+
+// Query all people in Team A
+const teamMembers = people.where("team", team1.rowID);
+console.log(teamMembers); // [1, 2] - array of row IDs
+```
+
+## Clearing Tables
+
+Remove all rows from a table using `clear()`:
+
+```ts
+const table = db.createTable("temp", { value: "i32" });
+
+// Add some data
+table.createRow(AnyStore.i32(1)).value = 100;
+table.createRow(AnyStore.i32(2)).value = 200;
+
+// Clear all rows
+table.clear();
+
+// Check if rows exist
+const row = table.getRow(AnyStore.i32(1));
+console.log(row); // null
 ```
 
 ## API Reference
@@ -237,29 +309,52 @@ await db.withLockAsync(async () => {
 - `withLock<T>(fn: () => T): T` - Execute function with exclusive lock (blocks in workers)
 - `withLockAsync<T>(fn: () => Promise<T>): Promise<T>` - Execute function with exclusive lock (async)
 - `notifyAll(): void` - Trigger all pending listener notifications
-- `memSize(): number` - Get current memory size
+- `memSize(): number` - Get current memory size in bytes
 
 ### Table<T>
 
-- `row(key: Something): Row<T>` - Get or create a row handle with the given key
-- `get(rowID: number, colName: keyof T): any | null` - Get a value directly (internal use)
-- `getRow(rowID: number): any[]` - Get entire row as array (internal use)
-- `deleteRow(rowID: number): void` - Delete a row (internal use)
-- `addListenerToRow(rowID: number, fn: () => void): number` - Add listener (internal use)
-- `removeListenerFromRow(listenerID: number, rowID: number): void` - Remove listener (internal use)
+**Methods**
+- `createRow(key: Something): Row<T>` - Create or get a row handle with the given key
+- `getRow(key: Something): Row<T> | null` - Get a row if it exists, return null otherwise
+- `where<K>(colName: K, value: ValueMap[T[K]]): number[]` - Query rows by column value, returns array of row IDs
+- `clear(): void` - Remove all rows from the table
 
 **Note:** Most table operations should be done through `Row` objects rather than directly on the table.
 
 ### Row<T>
 
 **Properties**
-- `key: Something` - The row's key (readonly)
+- `rowKey: Something` - The row's key (readonly)
+- `rowID: number` - The row's internal ID, useful for foreign key references
+- `[columnName]: ValueType | null` - Dynamic properties for each column defined in schema (type-safe)
 
 **Methods**
-- `get<K extends keyof T>(colName: K): ValueType | null` - Get column value (type-safe)
-- `update<K extends keyof T>(colName: K, value: ValueType | null): void` - Update column value
 - `getRow(): any[]` - Get entire row as array in schema order
 - `delete(): void` - Delete the entire row
 - `addListener(fn: () => void): number` - Add listener, returns listener ID
 - `removeListener(listenerID: number): void` - Remove listener by ID
-- `cached(onUpdate?: () => void): number` - Enable caching mode with optional callback
+- `cached(onUpdate?: () => void): number` - Enable caching mode with optional callback, returns listener ID
+
+**Property Accessors**
+
+Rows have type-safe property accessors for all columns. You can read and write values directly:
+
+```ts
+const table = db.createTable("users", {
+  name: "string",
+  age: "i32",
+});
+
+const row = table.createRow(AnyStore.i32(1));
+
+// Set values
+row.name = "Alice";
+row.age = 30;
+
+// Get values
+const name = row.name; // string | null
+const age = row.age;   // number | null
+
+// Use destructuring
+const { name: userName, age: userAge } = row;
+```
