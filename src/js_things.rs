@@ -63,15 +63,15 @@ impl GlobalState {
     }
 
     fn lock(&self) {
-        self.db.lock.lock();
+        self.db.lock.global_lock_write();
     }
 
     fn unlock(&self) {
-        self.db.lock.unlock();
+        self.db.lock.release_global_write();
     }
 
     fn try_lock(&self) -> bool {
-        return self.db.lock.try_lock();
+        return self.db.lock.try_global_lock_write();
     }
 
     fn lock_pointer(&self) -> *const i32 {

@@ -19,6 +19,18 @@ pub struct MyRwLock<T> {
 unsafe impl<T: Send> Send for MyRwLock<T> {}
 unsafe impl<T: Send + Sync> Sync for MyRwLock<T> {}
 
+thread_local! {
+    static HAS_LOCK: UnsafeCell<bool> = UnsafeCell::new(false);
+}
+
+fn has_global_lock() -> bool {
+    return HAS_LOCK.with(|v| unsafe { *v.get() });
+}
+
+fn set_global_lock(value: bool) {
+    HAS_LOCK.with(|v| unsafe { *v.get() = value });
+}
+
 impl<T> MyRwLock<T> {
     pub fn new(value: T) -> Self {
         MyRwLock {
@@ -35,7 +47,7 @@ impl<T> MyRwLock<T> {
     }
 
     pub fn write<'a>(&'a self) -> WriteGuard<'a, T> {
-        let result = self.lock.lock();
+        self.lock.lock_write();
         // SAFETY: We have acquired the lock, so it is safe to access the inner value.
         let inner = unsafe { self.get_mut() };
         // This is protection against reentrant locking
@@ -43,16 +55,12 @@ impl<T> MyRwLock<T> {
             panic!("Guard is already held by this thread");
         }
         inner.has_guard = true;
-        return WriteGuard {
-            rwlock: &self,
-            result,
-        };
+        return WriteGuard { rwlock: &self };
     }
 }
 
 pub struct WriteGuard<'a, T> {
     rwlock: &'a MyRwLock<T>,
-    result: LockResult,
 }
 
 impl<T> Drop for WriteGuard<'_, T> {
@@ -60,9 +68,7 @@ impl<T> Drop for WriteGuard<'_, T> {
         // SAFETY: We are the owner of the guard, so it is safe to modify the inner value and release the lock.
         let inner = unsafe { self.rwlock.get_mut() };
         inner.has_guard = false;
-        if self.result == LockResult::AcquiredFromMe {
-            self.rwlock.lock.unlock();
-        }
+        self.rwlock.lock.release_write();
     }
 }
 
@@ -82,16 +88,11 @@ impl<T> DerefMut for WriteGuard<'_, T> {
     }
 }
 
-const UNLOCKED: i32 = -1;
+const UNLOCKED: i32 = 0;
+const WRITE: i32 = -1;
 
 pub struct ThreadLock {
     lock_state: AtomicI32,
-}
-
-#[derive(PartialEq)]
-pub enum LockResult {
-    AlreadyHeldByCurrentThread,
-    AcquiredFromMe,
 }
 
 /**
@@ -107,52 +108,89 @@ impl ThreadLock {
         }
     }
 
-    pub fn lock(&self) -> LockResult {
-        let state = self.lock_state.load(Ordering::Relaxed);
-        if state == current_thread_value() {
-            return LockResult::AlreadyHeldByCurrentThread;
+    fn lock_read(&self) {
+        if has_global_lock() {
+            return;
         }
-
-        while self
-            .lock_state
-            .compare_exchange(
-                UNLOCKED,
-                current_thread_value(),
-                Ordering::Acquire,
-                Ordering::Relaxed,
-            )
-            .is_err()
-        {
-            if extern_functions::is_main_thread() {
-                continue;
+        loop {
+            let state = self.lock_state.load(Ordering::Relaxed);
+            if !has_writer(state) {
+                let is_ok = self
+                    .lock_state
+                    .compare_exchange(state, state + 1, Ordering::Acquire, Ordering::Relaxed)
+                    .is_ok();
+                if is_ok {
+                    return;
+                }
             }
-            #[cfg(target_arch = "wasm32")]
-            unsafe {
-                let ptr = self.lock_state.as_ptr();
-                std::arch::wasm32::memory_atomic_wait32(ptr, 1, 1000_000);
-            }
+            wait(&self.lock_state);
         }
-        return LockResult::AcquiredFromMe;
     }
 
-    pub fn unlock(&self) {
+    fn lock_write(&self) {
+        if has_global_lock() {
+            return;
+        }
+        loop {
+            let state = self.lock_state.load(Ordering::Relaxed);
+            if is_unlocked(state) {
+                let is_ok = self
+                    .lock_state
+                    .compare_exchange(state, WRITE, Ordering::Acquire, Ordering::Relaxed)
+                    .is_ok();
+                if is_ok {
+                    return;
+                }
+            }
+            wait(&self.lock_state);
+        }
+    }
+
+    fn release_read(&self) {
+        if has_global_lock() {
+            return;
+        }
+        self.lock_state.fetch_sub(-1, Ordering::Release);
+        notify(&self.lock_state);
+    }
+
+    fn release_write(&self) {
+        if has_global_lock() {
+            return;
+        }
         self.lock_state.store(UNLOCKED, Ordering::Release);
-        #[cfg(target_arch = "wasm32")]
-        unsafe {
-            std::arch::wasm32::memory_atomic_notify(self.lock_state.as_ptr(), 1);
-        }
+        notify(&self.lock_state);
     }
 
-    pub fn try_lock(&self) -> bool {
-        return self
+    pub fn try_global_lock_write(&self) -> bool {
+        if has_global_lock() {
+            panic!("Global lock is already held by this thread");
+        }
+        let ok = self
             .lock_state
-            .compare_exchange(
-                UNLOCKED,
-                current_thread_value(),
-                Ordering::Acquire,
-                Ordering::Relaxed,
-            )
+            .compare_exchange(UNLOCKED, WRITE, Ordering::Acquire, Ordering::Relaxed)
             .is_ok();
+        if ok {
+            set_global_lock(true);
+        }
+        return ok;
+    }
+
+    pub fn global_lock_write(&self) {
+        if has_global_lock() {
+            panic!("Global lock is already held by this thread");
+        }
+        self.lock_write();
+        set_global_lock(true);
+    }
+
+    pub fn release_global_write(&self) {
+        if !has_global_lock() {
+            panic!("Global lock is not held by this thread");
+        }
+        self.lock_state.store(UNLOCKED, Ordering::Release);
+        notify(&self.lock_state);
+        set_global_lock(false);
     }
 
     pub fn pointer(&self) -> *const i32 {
@@ -160,6 +198,27 @@ impl ThreadLock {
     }
 }
 
-fn current_thread_value() -> i32 {
-    return extern_functions::worker_id() as i32;
+fn is_unlocked(state: i32) -> bool {
+    return state == UNLOCKED;
+}
+
+fn has_writer(state: i32) -> bool {
+    return state < 0;
+}
+
+fn wait(lock_state: &AtomicI32) {
+    if !extern_functions::is_main_thread() {
+        #[cfg(target_arch = "wasm32")]
+        unsafe {
+            let ptr = lock_state.as_ptr();
+            std::arch::wasm32::memory_atomic_wait32(ptr, 1, 1000_000);
+        }
+    }
+}
+
+fn notify(lock_state: &AtomicI32) {
+    #[cfg(target_arch = "wasm32")]
+    unsafe {
+        std::arch::wasm32::memory_atomic_notify(lock_state.as_ptr(), 999);
+    }
 }
