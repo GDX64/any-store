@@ -82,6 +82,11 @@ impl GlobalState {
         let mut state = self.db.write();
         return f(&mut state);
     }
+
+    fn with_db<R, F: FnOnce(&Database) -> R>(&self, f: F) -> R {
+        let state = self.db.read();
+        return f(&state);
+    }
 }
 
 static GLOBALS: LazyLock<GlobalState> = LazyLock::new(|| GlobalState::new());
@@ -128,7 +133,7 @@ pub fn table_create() -> usize {
 #[wasm_bindgen]
 pub fn table_get_row_id(table_id: usize) -> i32 {
     return GLOBALS
-        .with_db_mut(|db| {
+        .with_db(|db| {
             let key = pop_from_something_stack()?;
             let row_id = db.get_row_by_key(table_id, &key)?;
             return Some(row_id as i32);
@@ -146,7 +151,7 @@ pub fn table_clear(table_id: usize) {
 pub fn table_get_id_from_name() -> i32 {
     let name = pop_from_something_stack().expect("there should be a name for the table");
     return GLOBALS
-        .with_db_mut(|db| {
+        .with_db(|db| {
             return db.get_table_id(name);
         })
         .map(|id| id as i32)
@@ -159,7 +164,7 @@ pub fn table_get_something(table: usize, col: usize, row_id: u32) {
 }
 
 fn _table_get_something(table: usize, col: usize, row_id: u32) -> Option<()> {
-    return GLOBALS.with_db_mut(|db| {
+    return GLOBALS.with_db(|db| {
         let value = db.get_row_value(table, row_id, col)?;
         push_to_js_stack(&value);
         return Some(());
@@ -172,7 +177,7 @@ pub fn table_get_row(table: usize, row_id: u32) {
 }
 
 fn _table_get_row(table: usize, row_id: u32) -> Option<()> {
-    return GLOBALS.with_db_mut(|db| {
+    return GLOBALS.with_db(|db| {
         let values = db.get_row_values(table, row_id)?;
         for item in &values {
             push_to_js_stack(item);
@@ -233,7 +238,7 @@ pub fn table_create_row(table: usize) -> i32 {
 
 #[wasm_bindgen]
 pub fn table_with_col_equals(table: usize, col: usize) {
-    GLOBALS.with_db_mut(|db| {
+    GLOBALS.with_db(|db| {
         let value = pop_from_something_stack()?;
         let rows = db.with_cols_equal_to(table, col, value)?;
         for row_id in rows {
